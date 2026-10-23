@@ -42,3 +42,6 @@ next-env.d.ts
 
 # ...except the sample, which carries no secrets
 !.env.local.example
+
+# Screenshots and scratch files from working sessions — kept locally, not shipped
+/Claude outputs/
