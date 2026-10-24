@@ -12,14 +12,22 @@ import pg, { type Pool, type QueryResultRow } from "pg";
  */
 const globalForDb = globalThis as unknown as { _skisensePool?: Pool };
 
+/**
+ * The pooled connection string, under either name a Neon/Vercel integration
+ * may install it as. Empty when neither is set, which is the signal the price
+ * routes use to fall back to the local backend.
+ */
 export function databaseUrl(): string {
   return process.env.DATABASE_URL ?? process.env.POSTGRES_URL ?? "";
 }
 
+/** Whether there is a database to read at all. */
 export function isDbConfigured(): boolean {
   return databaseUrl().length > 0;
 }
 
+// Built on first use rather than at import time: a cold instance that only
+// serves a proxied request should never open a connection it won't use.
 function getPool(): Pool {
   const existing = globalForDb._skisensePool;
   if (existing) return existing;

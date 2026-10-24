@@ -21,6 +21,9 @@ export interface CountryBadge {
 /** Keyed by both spellings so a row works before and after the backfill. */
 const COUNTRIES: Record<string, CountryBadge> = {};
 
+// Registers one badge under every spelling a source might send. Lower-cased
+// and trimmed on the way in and on lookup, since the Hebrew names arrive with
+// stray whitespace and the English ones with inconsistent capitalisation.
 function register(names: string[], badge: CountryBadge) {
   for (const name of names) COUNTRIES[name.trim().toLowerCase()] = badge;
 }

@@ -11,17 +11,26 @@ import { ChartTooltip, type TooltipState } from "./primitives/ChartTooltip";
 import { AnimatedNumber } from "./primitives/AnimatedNumber";
 import { useChartDimensions } from "@/lib/charts/useChartDimensions";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
-import { CHART_COLORS } from "@/lib/charts/palette";
+import { useChartColors } from "@/lib/charts/palette";
 import { COLORS } from "@/lib/design/tokens";
 import { bidi, eur, shortDate } from "@/lib/analytics/format";
 import { getBrand } from "@/lib/brands/config";
 import type { ResortLevel } from "@/lib/analytics/home";
 
+// The right margin is wide because every row is labelled twice outside the
+// plot — the total, then the stay length under it — and those labels are the
+// relief channel that makes the low-contrast bar legible, so they must never be
+// clipped. ROW_HEIGHT sets the svg height from the row count.
 const MARGIN = { top: 10, right: 134, bottom: 44, left: 128 };
 const ROW_HEIGHT = 38;
 
 /** Module-scope so AnimatedNumber keeps a stable function identity. */
 const asEur = (value: number) => eur(value);
+
+/** Falls back to the raw source slug: an operator whose collector is live but
+ *  which isn't in the brand registry yet should still be named on the chart
+ *  rather than leaving a blank where the reader expects one. */
+const operatorName = (source: string) => getBrand(source)?.name ?? source;
 
 /**
  * Where a ski week is cheapest right now.
@@ -42,6 +51,7 @@ export function CheapestResorts({
   levels: ResortLevel[];
   isFetching: boolean;
 }) {
+  const colors = useChartColors();
   const { ref, width } = useChartDimensions(760);
   const { move, stagger } = useChartMotion();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -68,7 +78,7 @@ export function CheapestResorts({
   const tableColumns: TableColumn<ResortLevel>[] = [
     { header: "Resort", render: (l) => l.resort },
     { header: "Country", render: (l) => bidi(l.country) },
-    { header: "Operator", render: (l) => getBrand(l.cheapest.source)?.name ?? l.cheapest.source },
+    { header: "Operator", render: (l) => operatorName(l.cheapest.source) },
     { header: "Departs", render: (l) => shortDate(l.cheapest.departure) },
     { header: "Nights", numeric: true, render: (l) => l.cheapest.nights },
     { header: "Cheapest total", numeric: true, render: (l) => eur(l.cheapest.total) },
@@ -102,13 +112,13 @@ export function CheapestResorts({
             borderColor: "divider",
           }}
         >
-          <Typography variant="h4" fontWeight={800} sx={{ color: CHART_COLORS.brand, lineHeight: 1.1 }}>
+          <Typography variant="h4" fontWeight={800} sx={{ color: colors.brand, lineHeight: 1.1 }}>
             <AnimatedNumber value={best.cheapest.total} format={asEur} />
           </Typography>
           <Typography variant="body2" color="text.secondary">
             cheapest booking on the board — {bidi(best.resort)}, {best.cheapest.nights} nights from{" "}
             {shortDate(best.cheapest.departure)} with{" "}
-            {getBrand(best.cheapest.source)?.name ?? best.cheapest.source}
+            {operatorName(best.cheapest.source)}
             {best.cheapest.pax ? `, total for ${best.cheapest.pax}` : ""}
           </Typography>
         </Stack>
@@ -145,7 +155,7 @@ export function CheapestResorts({
                           Cheapest: <strong>{eur(level.cheapest.total)}</strong> total for{" "}
                           {level.cheapest.nights} nights
                           <br />
-                          {getBrand(level.cheapest.source)?.name ?? level.cheapest.source} · departs{" "}
+                          {operatorName(level.cheapest.source)} · departs{" "}
                           {shortDate(level.cheapest.departure)}
                           {level.cheapest.hotel ? (
                             <>
@@ -154,7 +164,7 @@ export function CheapestResorts({
                             </>
                           ) : null}
                           <br />
-                          <span style={{ color: CHART_COLORS.inkSecondary }}>
+                          <span style={{ color: colors.inkSecondary }}>
                             {eur(level.cheapestPerNight)}/night, typical here{" "}
                             {eur(level.typicalPerNight)}/night · {level.n} offers
                           </span>
@@ -193,8 +203,8 @@ export function CheapestResorts({
                     animate={{ cx: from, opacity: 1 }}
                     transition={move(stagger(i))}
                     r={isBest ? 7 : 5.5}
-                    fill={isBest ? COLORS.accent : CHART_COLORS.brand}
-                    stroke={CHART_COLORS.surface}
+                    fill={isBest ? COLORS.accent : colors.brand}
+                    stroke={colors.surface}
                     strokeWidth={2}
                   />
 
@@ -208,7 +218,7 @@ export function CheapestResorts({
                     dy="0.32em"
                     fontSize={12.5}
                     fontWeight={isBest ? 800 : 600}
-                    fill={isBest ? COLORS.accent : CHART_COLORS.ink}
+                    fill={isBest ? COLORS.accent : colors.ink}
                     style={{ fontVariantNumeric: "tabular-nums" }}
                   >
                     {eur(level.cheapest.total)}
@@ -220,7 +230,7 @@ export function CheapestResorts({
                     x={innerWidth + 10}
                     y={y + 14}
                     fontSize={10.5}
-                    fill={CHART_COLORS.muted}
+                    fill={colors.muted}
                   >
                     {level.cheapest.nights} nights
                   </motion.text>

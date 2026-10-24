@@ -185,6 +185,8 @@ export function latestRows(latest: SourceOffers[] | undefined): SourcedRow[] {
   return (latest ?? []).flatMap((s) => s.data.map((row) => ({ ...row, source: s.source })));
 }
 
+// A latest-snapshot row as a ranking entry. The key is built with offerKey()
+// so a tile can point back at exactly the series the charts are drawing.
 function toBestPrice(source: string, row: PriceRow): BestPrice {
   return {
     key: offerKey(source, row.resortId, row.date, row.nights),
@@ -273,7 +275,6 @@ export function marketTrend(index: SeriesIndex): MarketPoint[] {
   return points;
 }
 
-
 /** A latest-snapshot row that still knows its operator. */
 export type SourcedRow = PriceRow & { source: string };
 
@@ -322,6 +323,10 @@ export function rankLadder(index: SeriesIndex, topN = 10): { days: DayISO[]; ser
     }
   }
 
+  // Buckets are keyed by resort *name*, not resort id: Pingwin and Skideal
+  // fold the stay length into the id ("752-7n"), which would split one resort
+  // into several ladder lines. The LadderSeries field is still called
+  // resortId; what it carries here is that name.
   const byResort = new Map<string, LadderSeries>();
   for (const day of days) {
     const ranked = [...(cheapestByDay.get(day) ?? new Map())].sort(

@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { fetchAllOffers, fetchLatestOffers } from "@/lib/api/pricesApi";
+import { PRICES_STALE_TIME_MS } from "./client";
 
 /**
  * The combined table and the stats section both call this — same queryKey,
@@ -12,7 +13,7 @@ export function useLatestOffers() {
     queryKey: ["prices", "latest"],
     queryFn: fetchLatestOffers,
     // The backend only refreshes once a day (02:00 Israel time), no need to poll.
-    staleTime: 5 * 60 * 1000,
+    staleTime: PRICES_STALE_TIME_MS,
     refetchOnWindowFocus: false,
   });
 }
@@ -22,7 +23,7 @@ export function useAllOffers() {
   return useQuery({
     queryKey: ["prices", "all"],
     queryFn: fetchAllOffers,
-    staleTime: 5 * 60 * 1000,
+    staleTime: PRICES_STALE_TIME_MS,
     refetchOnWindowFocus: false,
   });
 }

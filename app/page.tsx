@@ -8,6 +8,11 @@ import { BrandWidgetGrid } from "@/components/brand-widget/BrandWidgetGrid";
 import { BrandsTable } from "@/components/table/BrandsTable";
 import { AnalyticsSection } from "@/components/charts/AnalyticsSection";
 
+/**
+ * The home page. Brands, then every offer in one table, then the analytics —
+ * the table sits above the charts because most visits are "what's cheap now",
+ * which a row answers and a trend line doesn't.
+ */
 export default function Home() {
   return (
     <>

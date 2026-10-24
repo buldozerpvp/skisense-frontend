@@ -11,6 +11,9 @@ import { ChangeBoard } from "./ChangeBoard";
 import { SeasonBand } from "./SeasonBand";
 import { SnapshotScrubber } from "./SnapshotScrubber";
 
+/** Sentinel for the resort picker. No resort is called this, so "all" needs no
+ *  separate empty state in the Select — and an empty string would read as a
+ *  cleared field rather than a deliberate choice. */
 const ALL_RESORTS = "__all__";
 /** Enough resorts to show a market, few enough that every row stays labelled. */
 const RESORT_ROWS = 12;

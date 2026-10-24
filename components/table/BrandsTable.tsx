@@ -19,12 +19,13 @@ import {
   Link as MuiLink,
   MenuItem,
   TextField,
+  InputAdornment,
   Stack,
 } from "@mui/material";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { COLORS } from "@/lib/design/tokens";
 import {
-  PARTY_SIZES,
   fitsParty,
   paxOf,
   pricePerPerson,
@@ -32,11 +33,21 @@ import {
   type PartyChoice,
 } from "@/lib/table/pricing";
 import { countryBadge } from "@/lib/table/countries";
+import {
+  DEFAULT_PROPERTY_TYPES,
+  PROPERTY_TYPE_ICON,
+  PROPERTY_TYPE_LABEL,
+  hotelLabelOf,
+  hotelLabels,
+  propertyTypeOf,
+} from "@/lib/table/hotels";
+import { MultiSelectFilter, isOneOf } from "./MultiSelectFilter";
 import { shortDate } from "@/lib/analytics/format";
+import { matchesQuery } from "@/lib/table/search";
 import { useLatestOffers } from "@/lib/query/usePrices";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { BRANDS, getBrand } from "@/lib/brands/config";
-import type { OfferStatus, PriceRow } from "@/lib/brands/types";
+import type { OfferStatus, PriceRow, PropertyType } from "@/lib/brands/types";
 import { DateRangeFilter, isWithinDateRange, type DateRangeValue } from "./DateRangeFilter";
 import {
   NumberRangeFilter,
@@ -57,13 +68,27 @@ import {
 /** One price row, tagged with which brand (backend source) it came from. */
 type CombinedOfferRow = PriceRow & { brandSlug: string };
 
+// Only Club Med ever sets anything but `default`, which is why the column this
+// feeds is hidden until someone asks for it.
 const STATUS_LABEL: Record<OfferStatus, { label: string; color: "success" | "warning" | "default" }> = {
   green: { label: "Best price", color: "success" },
   orange: { label: "Limited", color: "warning" },
   default: { label: "Standard", color: "default" },
 };
 
+// Soonest departure first. "Clear" restores this rather than dropping the sort
+// altogether, so the table never falls back to the order the sources happened
+// to be fetched in.
 const DEFAULT_SORTING: MRT_SortingState = [{ id: "date", desc: false }];
+
+/**
+ * The table opens on catered places. Apartments, residences and chalets are a
+ * different kind of holiday and would otherwise sit in the same price list
+ * looking like cheap hotels.
+ */
+const DEFAULT_FILTERS: MRT_ColumnFiltersState = [
+  { id: "propertyType", value: DEFAULT_PROPERTY_TYPES },
+];
 
 const DAY_MS = 86_400_000;
 
@@ -88,12 +113,31 @@ function toOptions(values: (string | undefined)[]): { label: string; value: stri
     .map((value) => ({ label: value, value }));
 }
 
+/**
+ * The combined offers table: every operator's latest snapshot as one price list.
+ *
+ * The same component serves the home page and every brand page — a brand page
+ * only sets `selectedBrands` in the store, which scopes the rows and drops the
+ * Brand column. Filters, saved views and the party-size picker therefore live
+ * here rather than in either page, so the two can't drift apart.
+ */
 export function BrandsTable() {
+  // Opt this component out of React Compiler.
+  //
+  // Material React Table v3 builds its instance with useMaterialReactTable and
+  // mutates that instance's options during render. The compiler assumes
+  // render is pure, caches the state object it was handed, and the table then
+  // never sees isLoading go false — it sits on skeleton rows forever, with its
+  // loading overlay swallowing every click on the filters. Everything else in
+  // the app is compiled; this one component is not.
+  "use no memo";
+
   const { data, isLoading } = useLatestOffers();
   const selectedBrands = useAppStore((s) => s.selectedBrands);
   const searchText = useAppStore((s) => s.searchText);
+  const setSearchText = useAppStore((s) => s.setSearchText);
 
-  const [columnFilters, setColumnFilters] = useState<MRT_ColumnFiltersState>([]);
+  const [columnFilters, setColumnFilters] = useState<MRT_ColumnFiltersState>(DEFAULT_FILTERS);
   const [sorting, setSorting] = useState<MRT_SortingState>(DEFAULT_SORTING);
   // The size of party being shopped for. Offers are sold per room, so this
   // picks which offers are bookable at all — not just how a total is divided.
@@ -108,14 +152,24 @@ export function BrandsTable() {
     if (selectedBrands.length > 0) {
       all = all.filter((r) => selectedBrands.includes(r.brandSlug));
     }
-    const query = searchText.trim().toLowerCase();
+    // Every word typed has to appear somewhere in the row, in any field and
+    // in any order — see lib/table/search.ts. The English country name and
+    // its code join the haystack because the stored country is Hebrew, and
+    // "andorra" is what someone types.
+    const query = searchText.trim();
     if (query) {
-      all = all.filter(
-        (r) =>
-          r.resort.toLowerCase().includes(query) ||
-          r.country.toLowerCase().includes(query) ||
-          (r.hotel?.toLowerCase().includes(query) ?? false)
-      );
+      all = all.filter((r) => {
+        const badge = countryBadge(r.country);
+        return matchesQuery(
+          query,
+          r.resort,
+          r.hotel,
+          r.board,
+          r.country,
+          badge.name,
+          badge.code
+        );
+      });
     }
     return all;
   }, [data, selectedBrands, searchText]);
@@ -145,7 +199,18 @@ export function BrandsTable() {
     () => toOptions(matchingRows.map((r) => r.country)),
     [matchingRows]
   );
-  const hotelOptions = useMemo(() => toOptions(matchingRows.map((r) => r.hotel)), [matchingRows]);
+  // One name per property, shared by every operator that sells it.
+  const labels = useMemo(() => hotelLabels(matchingRows), [matchingRows]);
+  const hotelOptions = useMemo(
+    () => toOptions(matchingRows.map((r) => hotelLabelOf(r, labels))),
+    [matchingRows, labels]
+  );
+  const typeOptions = useMemo(() => {
+    const present = new Set(matchingRows.map((r) => propertyTypeOf(r)));
+    return (Object.keys(PROPERTY_TYPE_LABEL) as PropertyType[])
+      .filter((t) => present.has(t))
+      .map((t) => ({ label: `${PROPERTY_TYPE_ICON[t]} ${PROPERTY_TYPE_LABEL[t]}`, value: t }));
+  }, [matchingRows]);
   const paxOptions = useMemo(
     () =>
       [...new Set(matchingRows.map((r) => paxOf(r)))]
@@ -213,7 +278,7 @@ export function BrandsTable() {
   }, []);
 
   const handleClear = useCallback(() => {
-    setColumnFilters([]);
+    setColumnFilters(DEFAULT_FILTERS);
     setSorting(DEFAULT_SORTING);
     setActiveTemplateId("");
     storeActiveTemplateId("");
@@ -239,17 +304,22 @@ export function BrandsTable() {
             </Box>
           );
         },
-        filterVariant: "multi-select",
-        filterSelectOptions: BRANDS.map((b) => ({ label: b.name, value: b.slug })),
+        filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
+        Filter: ({ column }) => (
+          <MultiSelectFilter
+            column={column}
+            options={BRANDS.map((b) => ({ label: b.name, value: b.slug }))}
+          />
+        ),
       },
       {
         accessorKey: "resort",
         header: "Resort",
         size: 190,
-        // Autocomplete rather than a plain select: the list runs to hundreds of
-        // properties once every source is live, so it needs type-ahead.
-        filterVariant: "autocomplete",
-        filterSelectOptions: resortOptions,
+        // Hundreds of entries once every source is live, so the filter has a
+        // search box of its own — see MultiSelectFilter.
+        filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
+        Filter: ({ column }) => <MultiSelectFilter column={column} options={resortOptions} />,
         // The flag and three-letter code ride along with the resort so the
         // country reads at a glance without spending a whole column on it.
         Cell: ({ row }) => {
@@ -290,14 +360,17 @@ export function BrandsTable() {
       {
         // The property, kept out of the resort name so that grouping by resort
         // actually groups. Links to the offer when the operator gives us one.
-        accessorKey: "hotel",
+        id: "hotel",
         header: "Hotel",
-        size: 220,
-        filterVariant: "autocomplete",
-        filterSelectOptions: hotelOptions,
+        size: 240,
+        // The shared name, so one hotel reads and filters as one hotel however
+        // its operator spelled it.
+        accessorFn: (row) => hotelLabelOf(row, labels) ?? "",
+        filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
+        Filter: ({ column }) => <MultiSelectFilter column={column} options={hotelOptions} />,
         Cell: ({ row }) => {
-          const { hotel, url, board } = row.original;
-          const label = hotel ?? "—";
+          const { url, board } = row.original;
+          const label = hotelLabelOf(row.original, labels) ?? "—";
           return (
             <Box>
               {url ? (
@@ -325,9 +398,17 @@ export function BrandsTable() {
       {
         accessorKey: "country",
         header: "Country",
-        size: 130,
-        filterVariant: "multi-select",
-        filterSelectOptions: countryOptions,
+        size: 150,
+        filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
+        Filter: ({ column }) => (
+          <MultiSelectFilter
+            column={column}
+            options={countryOptions.map((o) => {
+              const badge = countryBadge(o.value);
+              return { ...o, label: `${badge.flag} ${badge.name}`.trim() };
+            })}
+          />
+        ),
         Cell: ({ cell }) => {
           const badge = countryBadge(cell.getValue<string>());
           return `${badge.flag} ${badge.name}`.trim();
@@ -373,15 +454,27 @@ export function BrandsTable() {
           return nights ? `${nights}` : "—";
         },
         sortingFn: "basic",
-        filterVariant: "multi-select",
-        filterSelectOptions: nightsOptions,
-        // Options are strings so they survive a round trip through a saved
-        // view; the accessor stays numeric so sorting still works.
-        filterFn: (row, id, value) => {
-          const selected = value as string[] | undefined;
-          if (!selected || selected.length === 0) return true;
-          return selected.includes(String(row.getValue<number>(id)));
+        filterFn: (row, id, value) => isOneOf(String(row.getValue<number>(id)), value),
+        Filter: ({ column }) => <MultiSelectFilter column={column} options={nightsOptions} />,
+      },
+      {
+        // Catered or self-catering. Apartments and chalets are hidden until
+        // asked for, because they aren't comparable with a half-board hotel.
+        id: "propertyType",
+        header: "Type",
+        size: 150,
+        accessorFn: (row) => propertyTypeOf(row),
+        Cell: ({ row }) => {
+          const type = propertyTypeOf(row.original);
+          return (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+              <span aria-hidden>{PROPERTY_TYPE_ICON[type]}</span>
+              {PROPERTY_TYPE_LABEL[type]}
+            </Box>
+          );
         },
+        filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
+        Filter: ({ column }) => <MultiSelectFilter column={column} options={typeOptions} />,
       },
       {
         // How many people the operator sells this offer for. It's the unit the
@@ -402,14 +495,10 @@ export function BrandsTable() {
             </Box>
           );
         },
-        filterVariant: "multi-select",
-        filterSelectOptions: paxOptions,
-        // Same string round-trip as Nights, so a saved view survives a reload.
-        filterFn: (row, id, value) => {
-          const selected = value as string[] | undefined;
-          if (!selected || selected.length === 0) return true;
-          return selected.includes(String(row.getValue<number>(id)));
-        },
+        // Values are strings so a saved view survives a reload; the accessor
+        // stays numeric so sorting still works.
+        filterFn: (row, id, value) => isOneOf(String(row.getValue<number>(id)), value),
+        Filter: ({ column }) => <MultiSelectFilter column={column} options={paxOptions} />,
       },
       {
         // What the booking actually costs. Operators quote in different units,
@@ -488,15 +577,20 @@ export function BrandsTable() {
         accessorKey: "status",
         header: "Status",
         size: 126,
-        filterVariant: "select",
-        filterSelectOptions: Object.entries(STATUS_LABEL).map(([value, { label }]) => ({ label, value })),
+        filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
+        Filter: ({ column }) => (
+          <MultiSelectFilter
+            column={column}
+            options={Object.entries(STATUS_LABEL).map(([value, { label }]) => ({ label, value }))}
+          />
+        ),
         Cell: ({ cell }) => {
           const { label, color } = STATUS_LABEL[cell.getValue<OfferStatus>()];
           return <Chip label={label} size="small" color={color} variant="outlined" />;
         },
       },
     ],
-    [resortOptions, countryOptions, nightsOptions, hotelOptions, paxOptions, party]
+    [resortOptions, countryOptions, nightsOptions, hotelOptions, paxOptions, typeOptions, labels, party]
   );
 
   // Visibility is user state, so it lives in a state hook with its own setter.
@@ -507,7 +601,12 @@ export function BrandsTable() {
   // and code; it stays one click away in the show/hide panel.
   const [columnVisibility, setColumnVisibility] = useState<MRT_VisibilityState>({
     brandSlug: true,
-    country: false,
+    // Country earns its place: the same hotel name occurs in several, and the
+    // flag in the resort cell is a hint rather than something you can filter.
+    country: true,
+    // Status is a Club Med urgency flag the other five don't set, so it sits
+    // in the show/hide panel rather than taking a column from everyone.
+    status: false,
   });
 
   // On a brand page every row is the same operator, so the Brand column would
@@ -603,6 +702,24 @@ export function BrandsTable() {
           onDelete={handleDelete}
           onClear={handleClear}
         />
+        {/* Searching sits with the filters it works alongside, rather than
+            in the page header away from the rows it affects. */}
+        <TextField
+          size="small"
+          placeholder="Search resort, hotel, country…"
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          sx={{ width: { xs: 190, sm: 260 }, "& .MuiOutlinedInput-root": { borderRadius: 999 } }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchRoundedIcon fontSize="small" sx={{ color: COLORS.inkFaint }} />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
         <Tooltip title="Operators sell a room, not a seat. This shows only the offers priced for a party of this size.">
           <TextField
             select
@@ -613,9 +730,12 @@ export function BrandsTable() {
             sx={{ width: 170 }}
           >
             <MenuItem value="any">Any size ({matchingRows.length})</MenuItem>
-            {PARTY_SIZES.map((n) => (
-              <MenuItem key={n} value={String(n)} disabled={!partyCounts.get(n)}>
-                {n} {n === 1 ? "person" : "people"} ({partyCounts.get(n) ?? 0})
+            {/* Only sizes an operator actually sells — a greyed-out "5 people"
+                every night is just noise. The list grows by itself if a
+                source starts returning family rooms. */}
+            {[...partyCounts.keys()].sort((a, b) => a - b).map((n) => (
+              <MenuItem key={n} value={String(n)}>
+                {n} {n === 1 ? "person" : "people"} ({partyCounts.get(n)})
               </MenuItem>
             ))}
           </TextField>

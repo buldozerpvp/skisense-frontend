@@ -10,11 +10,15 @@ import { ChartCard, type TableColumn } from "./primitives/ChartCard";
 import { ChartTooltip, type TooltipState } from "./primitives/ChartTooltip";
 import { useChartDimensions } from "@/lib/charts/useChartDimensions";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
-import { CHART_COLORS } from "@/lib/charts/palette";
+import { useChartColors } from "@/lib/charts/palette";
 import { bidi, eur, shortDate } from "@/lib/analytics/format";
 import { getBrand } from "@/lib/brands/config";
 import type { ResortSpread } from "@/lib/analytics/brand";
 
+// The left margin holds the resort names, the right the median figure.
+// DEFAULT_WIDTH is not just a fallback here: the whole chart is laid out at
+// this width and scaled by the viewBox, so it is also the divisor that turns
+// plot coordinates back into the CSS pixels the tooltip is positioned in.
 const MARGIN = { top: 12, right: 92, bottom: 48, left: 184 };
 const ROW_HEIGHT = 30;
 const DEFAULT_WIDTH = 760;
@@ -45,6 +49,7 @@ export function BrandResortSpread({
   isFetching: boolean;
   snapshotDay?: string | null;
 }) {
+  const colors = useChartColors();
   const { ref, width } = useChartDimensions(DEFAULT_WIDTH);
   const { move, stagger } = useChartMotion();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -52,7 +57,7 @@ export function BrandResortSpread({
   const brand = getBrand(slug);
   // The operator's own colour, used for exactly one thing: the median dot. The
   // rules and chrome stay neutral so the tint never competes with position.
-  const accent = brand?.color ?? CHART_COLORS.brand;
+  const accent = brand?.color ?? colors.brand;
 
   const innerWidth = Math.max(DEFAULT_WIDTH - MARGIN.left - MARGIN.right, 10);
   // The svg is laid out at DEFAULT_WIDTH and scaled by the viewBox, so tooltip
@@ -151,7 +156,7 @@ export function BrandResortSpread({
               x2={xScale(typical)}
               y1={0}
               y2={innerHeight}
-              stroke={CHART_COLORS.muted}
+              stroke={colors.muted}
               strokeWidth={1}
               strokeDasharray="4 3"
             />
@@ -182,7 +187,7 @@ export function BrandResortSpread({
                           <br />
                           {eur(spread.min)} – {eur(spread.max)} per night
                           <br />
-                          <span style={{ color: CHART_COLORS.inkSecondary }}>
+                          <span style={{ color: colors.inkSecondary }}>
                             Cheapest: {shortDate(spread.cheapest.date)} ·{" "}
                             {eur(spread.cheapest.priceEur)} for {spread.cheapestNights} nights
                           </span>
@@ -204,7 +209,7 @@ export function BrandResortSpread({
                     initial={{ x2: from }}
                     animate={{ x2: to }}
                     transition={move(delay)}
-                    stroke={CHART_COLORS.neutral}
+                    stroke={colors.neutral}
                     strokeWidth={single ? 0 : 3}
                     strokeOpacity={0.45}
                     strokeLinecap="round"
@@ -218,7 +223,7 @@ export function BrandResortSpread({
                         x2={from}
                         y1={y - 5}
                         y2={y + 5}
-                        stroke={CHART_COLORS.neutral}
+                        stroke={colors.neutral}
                         strokeWidth={1.5}
                       />
                       <motion.line
@@ -227,7 +232,7 @@ export function BrandResortSpread({
                         initial={{ x1: from, x2: from }}
                         animate={{ x1: to, x2: to }}
                         transition={move(delay)}
-                        stroke={CHART_COLORS.neutral}
+                        stroke={colors.neutral}
                         strokeWidth={1.5}
                       />
                     </>
@@ -242,8 +247,8 @@ export function BrandResortSpread({
                     animate={{ cx: mid }}
                     transition={move(delay)}
                     r={5.5}
-                    fill={single ? CHART_COLORS.surface : accent}
-                    stroke={single ? accent : CHART_COLORS.surface}
+                    fill={single ? colors.surface : accent}
+                    stroke={single ? accent : colors.surface}
                     strokeWidth={2}
                   />
 
@@ -257,7 +262,7 @@ export function BrandResortSpread({
                     dy="0.32em"
                     fontSize={12}
                     fontWeight={600}
-                    fill={CHART_COLORS.ink}
+                    fill={colors.ink}
                     style={{ fontVariantNumeric: "tabular-nums" }}
                   >
                     {eur(spread.median)}
@@ -275,7 +280,7 @@ export function BrandResortSpread({
               label="Price per person per night"
             />
             {/* Sits above the plot, clear of the axis label below it. */}
-            <text x={xScale(typical)} y={-1} textAnchor="middle" fontSize={11} fill={CHART_COLORS.muted}>
+            <text x={xScale(typical)} y={-1} textAnchor="middle" fontSize={11} fill={colors.muted}>
               typical resort {eur(typical)}
             </text>
           </g>

@@ -2,7 +2,7 @@
  * Where the frontend gets its prices.
  *
  * By default it calls its own route handlers under /api/prices, which read
- * MongoDB Atlas (see app/api/prices). That's what makes a Vercel deploy work
+ * Postgres directly (see app/api/prices). That's what makes a Vercel deploy work
  * without exposing the collector machine to the internet. Those handlers fall
  * back to proxying the local NestJS backend on :3000 when no connection string
  * is configured, so local development needs no setup either.

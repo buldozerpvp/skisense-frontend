@@ -101,6 +101,9 @@ export function ChartCard<T>({
   );
 }
 
+// The text equivalent of the chart, and the reason the aqua fill is allowed at
+// all. Scrolls inside a fixed box with a sticky head so switching views never
+// changes the card's height and shoves the rest of the page around.
 function DataTable<T>({ rows, columns }: { rows: T[]; columns: TableColumn<T>[] }) {
   return (
     <Box sx={{ maxHeight: 320, overflow: "auto" }}>

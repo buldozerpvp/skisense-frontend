@@ -1,6 +1,9 @@
 import { API_BASE_URL, PRICES_ENDPOINTS } from "./config";
 import type { SourceOffers, SourceOfferHistory } from "@/lib/brands/types";
 
+// A failed route handler answers with its own {error, detail} JSON, so a
+// non-2xx response has to throw rather than be parsed: otherwise the error
+// object flows on as if it were a list of offers.
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE_URL}${path}`);
   if (!res.ok) {

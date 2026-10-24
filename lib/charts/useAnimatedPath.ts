@@ -61,6 +61,10 @@ export function useAnimatedPath<T>(
   });
 }
 
+// Stretches or squeezes a frame to a given point count by nearest neighbour,
+// so two frames of different length still pair up index for index. Nearest
+// neighbour rather than interpolation on purpose: the values are re-tweened
+// anyway, and duplicating a point can't invent a price between two real ones.
 function resample<T>(source: T[], length: number): T[] {
   if (source.length === length) return source;
   if (source.length === 0 || length === 0) return [];

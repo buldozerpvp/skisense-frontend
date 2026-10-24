@@ -5,7 +5,8 @@ import { Providers } from "./providers";
 import { TopBar } from "@/components/layout/TopBar";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { APP_NAME, APP_TAGLINE } from "@/lib/branding";
-import { FONT_STYLESHEET_HREF } from "@/lib/design/tokens";
+import { FONT_STYLESHEET_HREF, themeVariablesCss } from "@/lib/design/tokens";
+import { THEME_INIT_SCRIPT } from "@/lib/design/useThemeMode";
 
 // Next picks up app/icon.png, app/apple-icon.png and app/favicon.ico
 // automatically, so the tab icon needs no manual <link> tags here.
@@ -14,15 +15,21 @@ export const metadata: Metadata = {
   description: APP_TAGLINE,
 };
 
+/** The frame every route shares: fonts, the client providers, header and footer. */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Webfonts load from Google; the stacks in tokens.ts fall back to
             system fonts if they don't arrive. */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link rel="stylesheet" href={FONT_STYLESHEET_HREF} />
+        {/* Both palettes as CSS variables, and the one script that picks a
+            side before anything paints — without it a visitor who prefers
+            dark gets a white flash on every navigation. */}
+        <style dangerouslySetInnerHTML={{ __html: themeVariablesCss() }} />
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body>
         <Providers>

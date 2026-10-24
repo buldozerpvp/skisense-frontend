@@ -6,6 +6,7 @@ export type DayISO = string;
 /** Identity of a tracked offer: the same resort + departure date across snapshots. */
 export type OfferKey = string;
 
+/** One observation: what a tracked offer cost on one snapshot day. */
 export interface OfferPoint {
   day: DayISO;
   priceEur: number;
@@ -32,6 +33,11 @@ export interface OfferSeries {
   isNew: boolean;
 }
 
+/**
+ * Every tracked offer's history in one object — the single input the analytics
+ * helpers read, so movers, the ladder and the market index can never be
+ * computed from differently filtered rows.
+ */
 export interface SeriesIndex {
   /** Every snapshot day seen, ascending. */
   days: DayISO[];

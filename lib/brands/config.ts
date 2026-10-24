@@ -19,6 +19,12 @@ export interface Brand {
   defaultNights?: number;
 }
 
+/**
+ * Every operator the site knows about, in the order the brand grid lays them
+ * out. This list is the registry: adding an entry is what makes a tile, a
+ * /brands/<slug> page and a source filter appear, and `slug` must match the
+ * backend's source name or the brand's rows never find their brand.
+ */
 export const BRANDS: Brand[] = [
   {
     slug: "clubmed",
@@ -86,6 +92,7 @@ export const BRANDS: Brand[] = [
   },
 ];
 
+/** Lookup by slug. Undefined for an unknown one — callers 404 or fall back on it. */
 export function getBrand(slug: string): Brand | undefined {
   return BRANDS.find((b) => b.slug === slug);
 }

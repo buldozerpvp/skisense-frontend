@@ -1,13 +1,31 @@
 import { createTheme, alpha } from "@mui/material/styles";
-import { COLORS, FONT_DISPLAY, FONT_SANS, RADIUS, SHADOWS } from "@/lib/design/tokens";
+import {
+  DARK_SHADOWS,
+  FONT_DISPLAY,
+  FONT_SANS,
+  PALETTES,
+  RADIUS,
+  SHADOWS,
+  type ThemeMode,
+} from "@/lib/design/tokens";
 
 /**
  * The MUI theme. It only maps design tokens onto MUI's slots — no raw hex
  * values live here, so restyling the app means editing lib/design/tokens.ts.
+ *
+ * This one takes the literal palette rather than the CSS variables the rest
+ * of the app uses, because MUI runs `alpha()` over several of these values
+ * and that needs a real colour to pick apart. Components should still reach
+ * for `COLORS`, which follows the mode without a re-render.
  */
-export const theme = createTheme({
+export function buildTheme(mode: ThemeMode) {
+  const COLORS = PALETTES[mode];
+  // Shadows are a light-mode device; on a dark ground they are invisible, so
+  // dark separates surfaces with a hairline edge instead.
+  const SHADOW = mode === "dark" ? DARK_SHADOWS : SHADOWS;
+  return createTheme({
   palette: {
-    mode: "light",
+    mode,
     primary: { main: COLORS.brand, dark: COLORS.brandDeep, light: COLORS.sky, contrastText: "#fff" },
     secondary: { main: COLORS.accent, light: COLORS.accentSoft, contrastText: "#fff" },
     success: { main: COLORS.positive },
@@ -43,10 +61,10 @@ export const theme = createTheme({
           backgroundImage: "none",
           border: `1px solid ${COLORS.border}`,
           borderRadius: RADIUS.lg,
-          boxShadow: SHADOWS.card,
+          boxShadow: SHADOW.card,
         },
         // Menus and popovers float — they get the stronger shadow, no border.
-        elevation8: { border: "none", boxShadow: SHADOWS.raised },
+        elevation8: { border: "none", boxShadow: SHADOW.raised },
       },
     },
 
@@ -86,7 +104,7 @@ export const theme = createTheme({
           "&.Mui-selected": {
             backgroundColor: COLORS.surface,
             color: COLORS.brand,
-            boxShadow: SHADOWS.card,
+            boxShadow: SHADOW.card,
             "&:hover": { backgroundColor: COLORS.surface },
           },
         },
@@ -139,3 +157,7 @@ export const theme = createTheme({
     },
   },
 });
+}
+
+/** The light theme, for anything that needs a theme outside the provider. */
+export const theme = buildTheme("light");

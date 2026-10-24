@@ -8,25 +8,29 @@ import {
   Toolbar,
   Typography,
   Container,
-  TextField,
-  InputAdornment,
   Box,
   Button,
+  IconButton,
+  Tooltip,
   Stack,
 } from "@mui/material";
-import SearchIcon from "@mui/icons-material/Search";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import { useAppStore } from "@/lib/store/useAppStore";
+import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
+import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
 import { APP_LOGO_ALT, APP_LOGO_SRC, APP_NAME } from "@/lib/branding";
 import { COLORS, FONT_DISPLAY } from "@/lib/design/tokens";
+import { useThemeMode } from "@/lib/design/useThemeMode";
 
 const LOGO_SIZE = 34;
 
-/** Sticky, frosted header. The search box only appears where there's a table to search. */
+/**
+ * Sticky, frosted header: the mark, one contextual action, and the theme
+ * switch. Searching lives in the table's own toolbar, next to the filters it
+ * works with, rather than up here away from them.
+ */
 export function TopBar() {
   const pathname = usePathname();
-  const searchText = useAppStore((s) => s.searchText);
-  const setSearchText = useAppStore((s) => s.setSearchText);
+  const { mode, toggle } = useThemeMode();
 
   const isHome = pathname === "/";
 
@@ -36,7 +40,9 @@ export function TopBar() {
       elevation={0}
       sx={{
         top: 0,
-        bgcolor: "rgba(255,255,255,0.82)",
+        // Tinted from the canvas so the blur reads in both themes; a fixed
+        // white would turn into a bright band in dark mode.
+        bgcolor: "color-mix(in srgb, var(--ss-surface) 82%, transparent)",
         backdropFilter: "blur(10px)",
         color: "text.primary",
         borderBottom: "1px solid",
@@ -59,29 +65,26 @@ export function TopBar() {
             </Box>
           </Stack>
 
-          <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 1.5 }}>
-            {isHome ? (
-              <TextField
-                size="small"
-                placeholder="Search resorts, countries…"
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                sx={{ minWidth: { xs: 200, sm: 280 }, "& .MuiOutlinedInput-root": { borderRadius: 999 } }}
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon fontSize="small" sx={{ color: COLORS.inkFaint }} />
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-              />
-            ) : (
+          <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 1 }}>
+            {!isHome && (
               <Button component={Link} href="/" size="small" startIcon={<ArrowBackRoundedIcon />}>
                 All brands
               </Button>
             )}
+            <Tooltip title={mode === "dark" ? "Switch to light" : "Switch to dark"}>
+              <IconButton
+                onClick={toggle}
+                size="small"
+                aria-label={mode === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+                sx={{ color: COLORS.inkMuted, border: "1px solid", borderColor: "divider" }}
+              >
+                {mode === "dark" ? (
+                  <LightModeRoundedIcon fontSize="small" />
+                ) : (
+                  <DarkModeRoundedIcon fontSize="small" />
+                )}
+              </IconButton>
+            </Tooltip>
           </Box>
         </Toolbar>
       </Container>

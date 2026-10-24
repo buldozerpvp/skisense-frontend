@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 
+/** Space a chart reserves outside its plot area for axes, ticks and labels. */
 export interface ChartMargin {
   top: number;
   right: number;

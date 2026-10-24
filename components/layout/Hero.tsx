@@ -13,6 +13,8 @@ function useHeroStats() {
 
   const stats = useMemo(() => {
     const rows = data?.flatMap((source) => source.data) ?? [];
+    // A flat minimum of the quoted price, not a per-night one: this is a
+    // headline to open the page with, not a comparison between operators.
     const cheapest = rows.length ? Math.min(...rows.map((r) => r.priceEur)) : null;
     return {
       offers: rows.length,
@@ -25,6 +27,10 @@ function useHeroStats() {
   return { ...stats, isLoading };
 }
 
+/**
+ * Page-top banner. Its figures come from the same latest-offers query the table
+ * below reads, so the headline counts can never disagree with the rows.
+ */
 export function Hero() {
   const { offers, resorts, operators, cheapest, isLoading } = useHeroStats();
 
@@ -103,7 +109,10 @@ export function Hero() {
                   py: 1.25,
                   minWidth: 132,
                   borderRadius: `${RADIUS.lg}px`,
-                  bgcolor: "rgba(255,255,255,0.75)",
+                  // Mixed from the surface token rather than a fixed white:
+                  // in dark mode a translucent white turned these tiles into
+                  // pale grey cards with unreadable labels.
+                  bgcolor: `color-mix(in srgb, ${COLORS.surface} 75%, transparent)`,
                   border: "1px solid",
                   borderColor: "divider",
                   backdropFilter: "blur(6px)",

@@ -2,21 +2,22 @@
 
 /* ---------------------------------------------------------------------------
    Tailwind colour tokens.
-   Mirrors the subset of lib/design/tokens.ts that Tailwind classes need
-   (bg-brand, text-ink, ring-border …). Change a colour there, change it here.
+   These point at the CSS variables emitted by lib/design/tokens.ts rather
+   than at hex values, so a Tailwind class follows the light/dark switch for
+   free. Change a colour in tokens.ts; nothing here needs touching.
    --------------------------------------------------------------------------- */
 @theme {
-  --color-ink: #0c2742;
-  --color-ink-muted: #5a7183;
-  --color-brand-deep: #0e3a66;
-  --color-brand: #1b4965;
-  --color-sky: #3c8dd8;
-  --color-ice: #cfeeff;
-  --color-frost: #ebf7ff;
-  --color-canvas: #f4f8fb;
-  --color-border: #dce7f0;
-  --color-accent: #e2703a;
-  --color-positive: #1baf7a;
+  --color-ink: var(--ss-ink);
+  --color-ink-muted: var(--ss-ink-muted);
+  --color-brand-deep: var(--ss-brand-deep);
+  --color-brand: var(--ss-brand);
+  --color-sky: var(--ss-sky);
+  --color-ice: var(--ss-ice);
+  --color-frost: var(--ss-frost);
+  --color-canvas: var(--ss-canvas);
+  --color-border: var(--ss-border);
+  --color-accent: var(--ss-accent);
+  --color-positive: var(--ss-positive);
 }
 
 html,
@@ -24,7 +25,10 @@ body {
   max-width: 100vw;
   min-height: 100%;
   overflow-x: hidden;
-  /* Keeps type crisp on the light canvas. */
+  /* Painted before React mounts, so the page never flashes white on the way
+     into dark mode. MUI's CssBaseline sets the same colours afterwards. */
+  background: var(--ss-canvas);
+  color: var(--ss-ink);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

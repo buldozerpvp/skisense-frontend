@@ -11,12 +11,15 @@ import { ChartCard, type TableColumn } from "./primitives/ChartCard";
 import { ChartTooltip, type TooltipState } from "./primitives/ChartTooltip";
 import { useChartDimensions } from "@/lib/charts/useChartDimensions";
 import { useAnimatedPath } from "@/lib/charts/useAnimatedPath";
-import { CHART_COLORS } from "@/lib/charts/palette";
+import { useChartColors } from "@/lib/charts/palette";
 import { COLORS } from "@/lib/design/tokens";
 import { bidi, dateValue, eur, monthLabel, shortDate } from "@/lib/analytics/format";
 import { getBrand } from "@/lib/brands/config";
 import type { SeasonWeek } from "@/lib/analytics/home";
 
+// The top margin is clearance for the two callouts, which are drawn above
+// their dots and would otherwise be cut off when the priciest week is also the
+// highest point. Height is fixed so the card keeps its size as weeks are added.
 const MARGIN = { top: 28, right: 20, bottom: 50, left: 62 };
 const HEIGHT = 320;
 
@@ -47,6 +50,7 @@ interface XY {
  * figure is still a hover and a table column away.
  */
 export function SeasonBand({ weeks, isFetching }: { weeks: SeasonWeek[]; isFetching: boolean }) {
+  const colors = useChartColors();
   const { ref, width } = useChartDimensions(760);
   const svgRef = useRef<SVGSVGElement>(null);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -88,6 +92,9 @@ export function SeasonBand({ weeks, isFetching }: { weeks: SeasonWeek[]; isFetch
     };
   }, [weeks, innerWidth, innerHeight]);
 
+  // Builders are memoised for the same reason as the seeds below: useAnimatedPath
+  // keeps them in its effect's dependency list, so a fresh arrow each render
+  // would restart the tween every render.
   const buildBand = useMemo(
     () => (points: BandPoint[]) =>
       area<BandPoint>()
@@ -120,6 +127,9 @@ export function SeasonBand({ weeks, isFetching }: { weeks: SeasonWeek[]; isFetch
   const bandPath = useAnimatedPath<BandPoint>(bandPoints, buildBand, lerpBand, { seed: seedBand });
   const linePath = useAnimatedPath<XY>(linePoints, buildLine, lerpXY, { seed: seedLine });
 
+  // Nearest-week hit testing against one transparent overlay, rather than a hit
+  // target per point. A full season packs the weeks a few pixels apart, so
+  // per-point targets would leave dead gaps the pointer falls through.
   function handleMove(event: React.MouseEvent<SVGRectElement>) {
     const svg = svgRef.current;
     if (!svg) return;
@@ -153,7 +163,7 @@ export function SeasonBand({ weeks, isFetching }: { weeks: SeasonWeek[]; isFetch
           {bidi(week.cheapest.resort)} ·{" "}
           {getBrand(week.cheapest.source)?.name ?? week.cheapest.source}
           <br />
-          <span style={{ color: CHART_COLORS.inkSecondary }}>
+          <span style={{ color: colors.inkSecondary }}>
             {eur(week.cheapestPerNight)}/night · cheapest quarter up to{" "}
             {eur(week.budgetPerNight)}/night · {week.n} offers
           </span>
@@ -215,13 +225,15 @@ export function SeasonBand({ weeks, isFetching }: { weeks: SeasonWeek[]; isFetch
           <g transform={`translate(${MARGIN.left}, ${MARGIN.top})`}>
             <AxisLeft scale={yScale} width={innerWidth} tickCount={4} format={(v) => `${eur(v)}/n`} />
 
-            {/* The spread between the bargain and the going rate that week. */}
+            {/* Fill under the cheapest line, down to the baseline. It carries no
+                second value of its own — it is there to give the line a body so
+                the season's shape reads from across the room. */}
             <motion.path d={bandPath} fill="url(#season-band)" stroke="none" />
             {/* The cheapest line is the one the reader follows. */}
             <motion.path
               d={linePath}
               fill="none"
-              stroke={CHART_COLORS.brand}
+              stroke={colors.brand}
               strokeWidth={2.5}
               strokeLinejoin="round"
               strokeLinecap="round"
@@ -229,15 +241,15 @@ export function SeasonBand({ weeks, isFetching }: { weeks: SeasonWeek[]; isFetch
 
             {peakWeek && (
               <g>
-                <circle cx={peakX} cy={peakY} r={4} fill={CHART_COLORS.inkSecondary} />
+                <circle cx={peakX} cy={peakY} r={4} fill={colors.inkSecondary} />
                 <text
                   x={peakLabel.x}
                   y={Math.max(peakY - 12, 12)}
                   textAnchor={peakLabel.anchor}
                   fontSize={11.5}
                   fontWeight={600}
-                  fill={CHART_COLORS.inkSecondary}
-                  stroke={CHART_COLORS.surface}
+                  fill={colors.inkSecondary}
+                  stroke={colors.surface}
                   strokeWidth={3.5}
                   paintOrder="stroke"
                 >
@@ -262,7 +274,7 @@ export function SeasonBand({ weeks, isFetching }: { weeks: SeasonWeek[]; isFetch
                   cy={cheapestY}
                   r={6.5}
                   fill={COLORS.accent}
-                  stroke={CHART_COLORS.surface}
+                  stroke={colors.surface}
                   strokeWidth={2}
                 />
                 {/* Painted with a surface-coloured outline so the callout stays
@@ -274,7 +286,7 @@ export function SeasonBand({ weeks, isFetching }: { weeks: SeasonWeek[]; isFetch
                   fontSize={12.5}
                   fontWeight={800}
                   fill={COLORS.accent}
-                  stroke={CHART_COLORS.surface}
+                  stroke={colors.surface}
                   strokeWidth={3.5}
                   paintOrder="stroke"
                 >
@@ -285,8 +297,8 @@ export function SeasonBand({ weeks, isFetching }: { weeks: SeasonWeek[]; isFetch
                   y={cheapestY - 11}
                   textAnchor={cheapestLabel.anchor}
                   fontSize={11}
-                  fill={CHART_COLORS.inkSecondary}
-                  stroke={CHART_COLORS.surface}
+                  fill={colors.inkSecondary}
+                  stroke={colors.surface}
                   strokeWidth={3.5}
                   paintOrder="stroke"
                 >
@@ -331,10 +343,16 @@ function anchorFor(x: number, innerWidth: number, halfWidth: number) {
   return { x, anchor: "middle" as const };
 }
 
+// useAnimatedPath interpolates the points and rebuilds `d` from them each
+// frame. Interpolating the `d` string instead would need both paths to have the
+// same command count, which they never do once the week count changes.
 function lerpXY(a: XY, b: XY, t: number): XY {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
 
+// The same, for the filled area. yBottom is interpolated alongside the rest
+// even though it is currently always the baseline, so that a future band with a
+// moving floor needs no change here.
 function lerpBand(a: BandPoint, b: BandPoint, t: number): BandPoint {
   return {
     x: a.x + (b.x - a.x) * t,

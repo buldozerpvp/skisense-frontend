@@ -10,6 +10,9 @@ export interface FilterTemplate {
   builtIn?: boolean;
 }
 
+// Version suffixes: a stored template holds column ids and filter values, so
+// a change to either ships as .v2 and quietly abandons the old key rather
+// than trying to migrate whatever an old browser saved.
 const TEMPLATES_KEY = "skisense.offers.templates.v1";
 const ACTIVE_KEY = "skisense.offers.activeTemplate.v1";
 
@@ -63,6 +66,8 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
+/** The user's own saved views. Built-ins aren't stored, so they stay current
+ *  across releases instead of freezing at whatever shipped first. */
 export function loadSavedTemplates(): FilterTemplate[] {
   return readJson<FilterTemplate[]>(TEMPLATES_KEY, []);
 }
@@ -88,6 +93,8 @@ export function saveTemplate(
   return next;
 }
 
+/** Drops a saved view and hands back the remaining list, so the caller can set
+ *  state from the return value instead of re-reading storage. */
 export function deleteTemplate(id: string): FilterTemplate[] {
   const next = loadSavedTemplates().filter((t) => t.id !== id);
   writeJson(TEMPLATES_KEY, next);
@@ -99,6 +106,7 @@ export function loadActiveTemplateId(): string {
   return readJson<string>(ACTIVE_KEY, "");
 }
 
+/** Remembers the chosen view; an empty id means "no template applied". */
 export function storeActiveTemplateId(id: string): void {
   writeJson(ACTIVE_KEY, id);
 }

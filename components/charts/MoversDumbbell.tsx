@@ -9,10 +9,14 @@ import { AxisBottom, AxisLeftBand } from "./primitives/Axes";
 import { ChartCard, type TableColumn } from "./primitives/ChartCard";
 import { ChartTooltip, type TooltipState } from "./primitives/ChartTooltip";
 import { useChartDimensions } from "@/lib/charts/useChartDimensions";
-import { CHART_COLORS, MOTION, changeColor } from "@/lib/charts/palette";
+import { useChartColors, MOTION, changeColor } from "@/lib/charts/palette";
 import { bidi, eur, eurDelta, offerLabel, pct, shortDate, trendGlyph } from "@/lib/analytics/format";
 import type { Movement } from "@/lib/analytics/types";
 
+// The left margin holds the resort-and-departure row label and the right holds
+// the change figure, both outside the plot so neither can overlap a dot.
+// ROW_HEIGHT sets the svg's height from the row count, so the card grows with
+// the data instead of scrolling a fixed box.
 const MARGIN = { top: 8, right: 92, bottom: 44, left: 190 };
 const ROW_HEIGHT = 30;
 
@@ -42,6 +46,7 @@ export function MoversDumbbell({
   const delta = (m: Movement) => (basis === "prev" ? m.deltaPrev : m.deltaFirst);
   const percent = (m: Movement) => (basis === "prev" ? m.pctPrev : m.pctFirst);
   const sinceLabel = basis === "prev" ? "last night" : "we started tracking";
+  const colors = useChartColors();
   const { ref, width } = useChartDimensions(720);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
@@ -117,7 +122,7 @@ export function MoversDumbbell({
               const from = xScale(before(m));
               const to = xScale(m.latest);
               const move = delta(m);
-              const color = changeColor(move);
+              const color = changeColor(move, colors);
               const delay = i * MOTION.stagger;
 
               return (
@@ -143,7 +148,7 @@ export function MoversDumbbell({
                           {m.status !== "default" && (
                             <>
                               <br />
-                              <span style={{ color: CHART_COLORS.inkSecondary }}>
+                              <span style={{ color: colors.inkSecondary }}>
                                 The operator calls this {m.status === "green" ? "their best price" : "last rooms"}
                               </span>
                             </>
@@ -172,7 +177,7 @@ export function MoversDumbbell({
                     strokeLinecap="round"
                   />
                   {/* Where it was: hollow, recessive. */}
-                  <circle cx={from} cy={y} r={4} fill={CHART_COLORS.surface} stroke={CHART_COLORS.muted} strokeWidth={1.5} />
+                  <circle cx={from} cy={y} r={4} fill={colors.surface} stroke={colors.muted} strokeWidth={1.5} />
                   {/* Where it is now: solid, with a surface ring so overlaps stay readable. */}
                   <motion.circle
                     cy={y}
@@ -181,7 +186,7 @@ export function MoversDumbbell({
                     transition={{ duration: MOTION.grow, delay, ease: "easeOut" }}
                     r={5.5}
                     fill={color}
-                    stroke={CHART_COLORS.surface}
+                    stroke={colors.surface}
                     strokeWidth={2}
                   />
                   {/* Direct label: the relief channel that makes the aqua fill legible. */}

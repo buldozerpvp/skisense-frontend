@@ -10,11 +10,14 @@ import { ChartTooltip, type TooltipState } from "./primitives/ChartTooltip";
 import { AnimatedNumber } from "./primitives/AnimatedNumber";
 import { useChartDimensions } from "@/lib/charts/useChartDimensions";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
-import { CHART_COLORS, changeColor } from "@/lib/charts/palette";
+import { useChartColors, changeColor } from "@/lib/charts/palette";
 import { bidi, eur, eurDelta, pct, shortDate, truncateLabel } from "@/lib/analytics/format";
 import { getBrand } from "@/lib/brands/config";
 import type { HomeOffer, HomeSummary } from "@/lib/analytics/home";
 
+// The left margin carries two lines per row — what the offer is, and what it
+// costs now — and the top margin carries the cheaper/dearer legend above the
+// zero line. ROW_HEIGHT sets the svg height from the row count.
 const MARGIN = { top: 26, right: 24, bottom: 34, left: 198 };
 const ROW_HEIGHT = 40;
 /**
@@ -24,6 +27,7 @@ const ROW_HEIGHT = 40;
  */
 const LABEL_GUTTER = 84;
 
+/** Module-scope so AnimatedNumber keeps a stable function identity. */
 const asCount = (value: number) => String(Math.round(value));
 
 /**
@@ -48,6 +52,7 @@ export function ChangeBoard({
   summary: HomeSummary;
   isFetching: boolean;
 }) {
+  const colors = useChartColors();
   const { ref, width } = useChartDimensions(760);
   const { move, stagger } = useChartMotion();
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -102,7 +107,7 @@ export function ChangeBoard({
         sx={{ mb: 2 }}
       >
         <Stack direction="row" spacing={0.75} alignItems="baseline">
-          <Typography variant="h4" fontWeight={800} sx={{ color: CHART_COLORS.drop }}>
+          <Typography variant="h4" fontWeight={800} sx={{ color: colors.drop }}>
             <AnimatedNumber value={summary.cheaper} format={asCount} duration={0.5} />
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -110,7 +115,7 @@ export function ChangeBoard({
           </Typography>
         </Stack>
         <Stack direction="row" spacing={0.75} alignItems="baseline">
-          <Typography variant="h4" fontWeight={800} sx={{ color: CHART_COLORS.rise }}>
+          <Typography variant="h4" fontWeight={800} sx={{ color: colors.rise }}>
             <AnimatedNumber value={summary.dearer} format={asCount} duration={0.5} />
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -132,10 +137,10 @@ export function ChangeBoard({
         >
           <g transform={`translate(${MARGIN.left}, ${MARGIN.top})`}>
             {/* Direction legend sits on the frame, not on the data. */}
-            <text x={zero - 10} y={-12} textAnchor="end" fontSize={11} fontWeight={600} fill={CHART_COLORS.drop}>
+            <text x={zero - 10} y={-12} textAnchor="end" fontSize={11} fontWeight={600} fill={colors.drop}>
               ◀ cheaper
             </text>
-            <text x={zero + 10} y={-12} fontSize={11} fontWeight={600} fill={CHART_COLORS.rise}>
+            <text x={zero + 10} y={-12} fontSize={11} fontWeight={600} fill={colors.rise}>
               dearer ▶
             </text>
 
@@ -145,7 +150,7 @@ export function ChangeBoard({
               x2={zero}
               y1={-4}
               y2={innerHeight}
-              stroke={CHART_COLORS.axis}
+              stroke={colors.axis}
               strokeWidth={1}
             />
 
@@ -156,7 +161,7 @@ export function ChangeBoard({
               const isDrop = (m.delta ?? 0) < 0;
               // Colour snaps; only the geometry tweens. A tweened fill passes
               // through the neutral midpoint and reads as "no change".
-              const colour = changeColor(m.delta);
+              const colour = changeColor(m.delta, colors);
               const left = Math.min(zero, end);
               const barWidth = Math.abs(end - zero);
 
@@ -207,7 +212,7 @@ export function ChangeBoard({
                     textAnchor="end"
                     fontSize={12}
                     fontWeight={600}
-                    fill={CHART_COLORS.ink}
+                    fill={colors.ink}
                   >
                     {truncateLabel(bidi(m.resort), 18)} · {shortDate(m.departure)}
                   </text>
@@ -216,7 +221,7 @@ export function ChangeBoard({
                     y={y + 10}
                     textAnchor="end"
                     fontSize={11}
-                    fill={CHART_COLORS.muted}
+                    fill={colors.muted}
                     style={{ fontVariantNumeric: "tabular-nums" }}
                   >
                     now {eur(m.total)} · {m.nights}n
@@ -258,7 +263,7 @@ export function ChangeBoard({
                     y={y + 11}
                     textAnchor={isDrop ? "end" : "start"}
                     fontSize={11}
-                    fill={CHART_COLORS.muted}
+                    fill={colors.muted}
                     style={{ fontVariantNumeric: "tabular-nums" }}
                   >
                     {m.pct != null ? pct(m.pct, 0) : ""}

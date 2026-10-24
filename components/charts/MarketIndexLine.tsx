@@ -10,10 +10,14 @@ import { useAnimatedPath } from "@/lib/charts/useAnimatedPath";
 import { AxisLeft } from "./primitives/Axes";
 import { ChartCard, type TableColumn } from "./primitives/ChartCard";
 import { useChartDimensions } from "@/lib/charts/useChartDimensions";
-import { CHART_COLORS, changeColor } from "@/lib/charts/palette";
+import { useChartColors, changeColor } from "@/lib/charts/palette";
 import { eur, pct, shortDate } from "@/lib/analytics/format";
 import type { MarketPoint } from "@/lib/analytics/types";
 
+// The right margin is reserved for the end-of-line percentage label, which sits
+// outside the plot so it can never land on top of the final point. Height is
+// fixed: the chart gains a point per snapshot, and a card that grew taller every
+// night would shift everything below it.
 const MARGIN = { top: 16, right: 56, bottom: 40, left: 56 };
 const HEIGHT = 240;
 
@@ -22,6 +26,9 @@ interface XY {
   y: number;
 }
 
+// useAnimatedPath interpolates the points and rebuilds `d` from them each
+// frame. Interpolating the `d` string instead would need both paths to have the
+// same command count, which they never do once a snapshot is added.
 function lerpXY(a: XY, b: XY, t: number): XY {
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
 }
@@ -34,6 +41,7 @@ function lerpXY(a: XY, b: XY, t: number): XY {
  * Each step compares only the offers present on both days.
  */
 export function MarketIndexLine({ points, isFetching }: { points: MarketPoint[]; isFetching: boolean }) {
+  const colors = useChartColors();
   const { ref, width } = useChartDimensions(520);
 
   const innerWidth = Math.max(width - MARGIN.left - MARGIN.right, 10);
@@ -65,6 +73,9 @@ export function MarketIndexLine({ points, isFetching }: { points: MarketPoint[];
     };
   }, [points, innerWidth, innerHeight]);
 
+  // Memoised because useAnimatedPath keeps the builder in its effect's
+  // dependency list: a fresh arrow per render would restart the tween every
+  // render and the line would never settle.
   const buildPath = useMemo(
     () =>
       (pts: XY[]) =>
@@ -111,14 +122,14 @@ export function MarketIndexLine({ points, isFetching }: { points: MarketPoint[];
               x2={innerWidth}
               y1={yScale(100)}
               y2={yScale(100)}
-              stroke={CHART_COLORS.axis}
+              stroke={colors.axis}
               strokeWidth={1}
             />
 
             {/* Colour snaps, position tweens: the diverging palette passes
                 through neutral at its midpoint, so a tweened fill would read
                 "no change" halfway through every transition. */}
-            <motion.path d={path} fill="none" stroke={changeColor(net)} strokeWidth={2} strokeLinecap="round" />
+            <motion.path d={path} fill="none" stroke={changeColor(net, colors)} strokeWidth={2} strokeLinecap="round" />
 
             {points.map((point) => (
               <g key={point.day}>
@@ -126,8 +137,8 @@ export function MarketIndexLine({ points, isFetching }: { points: MarketPoint[];
                   cx={xScale(point.day) ?? 0}
                   cy={yScale(point.index)}
                   r={4}
-                  fill={changeColor(net)}
-                  stroke={CHART_COLORS.surface}
+                  fill={changeColor(net, colors)}
+                  stroke={colors.surface}
                   strokeWidth={2}
                 />
                 <title>
@@ -138,7 +149,7 @@ export function MarketIndexLine({ points, isFetching }: { points: MarketPoint[];
                   y={innerHeight + 18}
                   textAnchor="middle"
                   fontSize={11}
-                  fill={CHART_COLORS.muted}
+                  fill={colors.muted}
                 >
                   {shortDate(point.day)}
                 </text>
@@ -151,7 +162,7 @@ export function MarketIndexLine({ points, isFetching }: { points: MarketPoint[];
               dy="0.32em"
               fontSize={12}
               fontWeight={600}
-              fill={changeColor(net)}
+              fill={changeColor(net, colors)}
             >
               {pct(net, 1)}
             </text>

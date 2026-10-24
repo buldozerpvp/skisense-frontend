@@ -3,6 +3,7 @@ import { create } from "zustand";
 interface AppState {
   /** Brand slugs currently selected via the brand cards. Empty = show all. */
   selectedBrands: string[];
+  /** Free-text filter typed in the top bar, shared with the offers table. */
   searchText: string;
   toggleBrand: (slug: string) => void;
   setSelectedBrands: (slugs: string[]) => void;

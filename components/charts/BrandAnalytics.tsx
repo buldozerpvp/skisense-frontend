@@ -14,7 +14,7 @@ import {
   resortSpreads,
 } from "@/lib/analytics/brand";
 import { eur, offerLabel, pct, shortDate, trendGlyph } from "@/lib/analytics/format";
-import { CHART_COLORS, changeColor } from "@/lib/charts/palette";
+import { useChartColors, changeColor } from "@/lib/charts/palette";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
 import { getBrand } from "@/lib/brands/config";
 import { paxOf, totalPrice } from "@/lib/table/pricing";
@@ -48,6 +48,7 @@ export interface BrandAnalyticsProps {
  * nothing at all renders nothing.
  */
 export function BrandAnalytics({ slug, showHeading = true }: BrandAnalyticsProps) {
+  const colors = useChartColors();
   const { data: latest, isFetching: fetchingLatest } = useLatestOffers();
   const { data: history, isFetching: fetchingHistory } = useAllOffers();
   const isFetching = fetchingLatest || fetchingHistory;
@@ -97,7 +98,7 @@ export function BrandAnalytics({ slug, showHeading = true }: BrandAnalyticsProps
               label="Cheapest booking right now"
               value={headline.cheapest ? totalPrice(headline.cheapest) : null}
               format={asEur}
-              accent={CHART_COLORS.drop}
+              accent={colors.drop}
               detail={
                 headline.cheapest
                   ? `${offerLabel(headline.cheapest.resort, headline.cheapest.date)} · total for ${paxOf(
@@ -114,7 +115,7 @@ export function BrandAnalytics({ slug, showHeading = true }: BrandAnalyticsProps
               label="Typical price per night"
               value={headline.medianPerNight}
               format={asEur}
-              accent={CHART_COLORS.brand}
+              accent={colors.brand}
               detail={
                 headline.medianPerNight !== null
                   ? `Median of ${headline.comparableCount} departures, per person per night`
@@ -130,7 +131,7 @@ export function BrandAnalytics({ slug, showHeading = true }: BrandAnalyticsProps
               value={headline.resortCount}
               format={asCount}
               duration={0.5}
-              accent={brand?.color ?? CHART_COLORS.brand}
+              accent={brand?.color ?? colors.brand}
               detail={`${headline.departureCount} priced departures across ${headline.countryCount} ${
                 headline.countryCount === 1 ? "country" : "countries"
               }`}
@@ -143,7 +144,7 @@ export function BrandAnalytics({ slug, showHeading = true }: BrandAnalyticsProps
               label="Since the last check"
               value={headline.lastNightPct}
               format={asPct}
-              accent={changeColor(headline.lastNightPct)}
+              accent={changeColor(headline.lastNightPct, colors)}
               glyph={headline.lastNightPct != null ? trendGlyph(headline.lastNightPct) : undefined}
               detail={
                 headline.lastNightPct != null
@@ -180,6 +181,8 @@ export function BrandAnalytics({ slug, showHeading = true }: BrandAnalyticsProps
   );
 }
 
+// One headline figure with its caption. `index` only drives the entrance
+// stagger, so the tiles have to be rendered in the order they read.
 function Tile({
   label,
   value,

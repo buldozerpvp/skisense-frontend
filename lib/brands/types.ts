@@ -4,6 +4,9 @@
  * Kept in sync by hand since the two projects aren't a shared monorepo.
  */
 
+/** Hotels and clubs are catered; apartments and chalets are self-catering. */
+export type PropertyType = "hotel" | "club" | "apartment" | "chalet";
+
 /** How urgently Club Med (and future sources) flag one priced departure date. */
 export type OfferStatus = "green" | "orange" | "default";
 
@@ -17,6 +20,12 @@ export interface PriceRow {
   resortKey?: string;
   /** The property sold at that resort: a hotel, chalet or club. */
   hotel?: string;
+  /** Shared identity for the property across operators, `<resortKey>|<slug>`.
+   *  Ophir's "VIHREN PALACE" and Issta's "Vihren Palace Ski & Spa Resort"
+   *  carry the same key, so they filter and group as one hotel. */
+  hotelKey?: string;
+  /** What kind of place it is. The table shows hotels and clubs by default. */
+  propertyType?: PropertyType;
   /** Board basis, where the operator states one. */
   board?: string;
   country: string;

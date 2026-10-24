@@ -16,6 +16,8 @@ interface OfferRecord {
   resort: string;
   resortKey: string | null;
   hotel: string | null;
+  hotelKey: string | null;
+  propertyType: string | null;
   board: string | null;
   country: string;
   date: string;
@@ -26,6 +28,15 @@ interface OfferRecord {
   url: string | null;
 }
 
+/**
+ * The column list both queries share, so every endpoint returns the same shape.
+ *
+ * The quoted aliases survive Postgres folding identifiers to lower case, which
+ * is what keeps `resortId` from arriving as `resortid`. `price_eur` is cast
+ * because the driver hands `numeric` back as a string, and a string price
+ * silently sorts and subtracts as text. The collected day stays DD-MM-YYYY to
+ * match what the collector writes; `toIsoDay()` flips it before anything sorts.
+ */
 const SELECT_COLUMNS = `
   o.source,
   to_char(o.collected_on, 'DD-MM-YYYY') as day,
@@ -33,6 +44,8 @@ const SELECT_COLUMNS = `
   o.resort,
   o.resort_key       as "resortKey",
   o.hotel,
+  o.hotel_key        as "hotelKey",
+  o.property_type    as "propertyType",
   o.board,
   o.country,
   to_char(o.departure, 'YYYY-MM-DD') as date,
@@ -51,6 +64,8 @@ function toPriceRow(r: OfferRecord): PriceRow {
     // existing fallbacks (brand.defaultNights, "—") already check for.
     resortKey: r.resortKey ?? undefined,
     hotel: r.hotel ?? undefined,
+    hotelKey: r.hotelKey ?? undefined,
+    propertyType: (r.propertyType as PriceRow["propertyType"]) ?? undefined,
     board: r.board ?? undefined,
     country: r.country,
     date: r.date,

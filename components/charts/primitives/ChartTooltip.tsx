@@ -2,7 +2,13 @@
 
 import type { ReactNode } from "react";
 import { Box } from "@mui/material";
+import { useChartColors } from "@/lib/charts/palette";
 
+/**
+ * Position is in CSS pixels relative to the chart's container, not SVG user
+ * units — a chart drawn at a fixed width and scaled by its viewBox has to
+ * convert before setting this, or the tooltip drifts away from its mark.
+ */
 export interface TooltipState {
   x: number;
   y: number;
@@ -21,6 +27,7 @@ export function ChartTooltip({
   tooltip: TooltipState | null;
   containerWidth: number;
 }) {
+  const colors = useChartColors();
   if (!tooltip) return null;
 
   const flip = tooltip.x > containerWidth - 220;
@@ -35,7 +42,10 @@ export function ChartTooltip({
         transform: flip ? "translate(-100%, -50%) translateX(-12px)" : "translate(0, -50%) translateX(12px)",
         pointerEvents: "none",
         zIndex: 5,
-        bgcolor: "rgba(255,255,255,0.97)",
+        // Very slightly translucent, as before, so a mark directly underneath
+        // still reads through it — mixed rather than a fixed rgba so it holds
+        // in both themes.
+        bgcolor: `color-mix(in srgb, ${colors.surface} 97%, transparent)`,
         border: "1px solid",
         borderColor: "divider",
         borderRadius: 1.5,

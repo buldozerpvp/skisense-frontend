@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Box, IconButton, Slider, Stack, Typography, Chip } from "@mui/material";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import PauseRoundedIcon from "@mui/icons-material/PauseRounded";
-import { MOTION } from "@/lib/charts/palette";
+import { MOTION, useChartColors } from "@/lib/charts/palette";
 import { useChartMotion } from "@/lib/charts/useChartMotion";
 import { useSnapshotCursor } from "@/lib/store/useSnapshotCursor";
 import { shortDate } from "@/lib/analytics/format";
@@ -20,6 +20,7 @@ import type { DayISO } from "@/lib/analytics/types";
  * slide would draw numbers nobody scraped.
  */
 export function SnapshotScrubber({ days }: { days: DayISO[] }) {
+  const colors = useChartColors();
   const { reduced } = useChartMotion();
   const { index, playing, setIndex, setPlaying, advance } = useSnapshotCursor();
   const lastIndex = days.length - 1;
@@ -68,7 +69,7 @@ export function SnapshotScrubber({ days }: { days: DayISO[] }) {
           size="small"
           onClick={() => (playing ? setPlaying(false) : start())}
           aria-label={playing ? "Pause playback" : "Play price history"}
-          sx={{ bgcolor: "#fff", border: "1px solid", borderColor: "divider" }}
+          sx={{ bgcolor: colors.surface, border: "1px solid", borderColor: "divider" }}
         >
           {playing ? <PauseRoundedIcon fontSize="small" /> : <PlayArrowRoundedIcon fontSize="small" />}
         </IconButton>
