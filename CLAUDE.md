@@ -80,6 +80,50 @@ Rules worth keeping:
 - White on a brand-coloured gradient (`BrandHero`, `ComingSoon`) stays white
   in both themes — the ground under it is the brand colour, not the surface.
 
+## The phone app
+
+Below 900px the site is a different app, not a squeezed table. The shell is
+exactly one viewport tall and the page never scrolls: `MobileShell` is
+`height: 100dvh; overflow: hidden`, every strip of chrome is `flex: 0 0 auto`,
+and the single scrolling region is the list itself (`flex: 1; min-height: 0;
+overflow-y: auto`). Sticky positioning is not enough — it pins the header but
+lets the search box and the filter chips slide away under it. If you add a
+screen, keep that shape or the whole page starts scrolling again.
+
+`Responsive`
+(`components/mobile/Responsive.tsx`) picks a tree once `useIsMobile()` knows
+the viewport — it returns `null` on the server, and the placeholder frame is
+deliberate: guessing desktop flashes the eleven-column table onto a phone.
+`TopBar` and `SiteFooter` hide at the same breakpoint, because `MobileShell`
+brings its own header and bottom bar.
+
+- **Two destinations** in the bottom bar, Offers and Brands. Analytics is a
+  pill in the top bar on every screen — a place you visit, not a place you
+  browse from, and two tabs keep both targets wide.
+- **`lib/mobile/model.ts`** flattens a snapshot row into everything a phone
+  row shows (label, badge, total, per person, overnight move) once, because a
+  phone row has no columns to resolve cells from. The move comes from
+  `buildHomeModel`, looked up by the same `source|resortId|hotel|date|nights`
+  key, and stays null until the history query lands — the list must not wait
+  for it.
+- **One filter store** (`useMobileFilters`) for every screen, so narrowing on
+  Brands is still narrowing when you switch to Offers. `null` on a
+  multi-select means no filter, the same three states the desktop
+  `MultiSelectFilter` uses.
+- **Chips select, they don't deselect.** Tapping an operator chip while
+  nothing is filtered sets that one operator. Emptying a chip group goes back
+  to "all" rather than leaving a blank list with no way out.
+- **Resort and Hotel are drill-in pickers** (`ValuePicker`), not chip rows:
+  hundreds of values each. Select all / None live in the list *header*, never
+  as list rows — inside the list is exactly what made the desktop All button
+  report "1 selected". The hotel list is scoped to the chosen resorts.
+- **A short result list explains itself.** When a search matches more than
+  the filters allow through, the list says how many are hidden and offers one
+  tap to clear. Silence there reads as a broken index.
+- Analytics reads the same filtered set as the list. Its month band uses one
+  hue at varying weight — the aqua/red pair means price *change*, and a dear
+  month is not a month that rose.
+
 ## The offers table
 
 - **Hotels.** Rows share a `hotelKey` when they are the same property across

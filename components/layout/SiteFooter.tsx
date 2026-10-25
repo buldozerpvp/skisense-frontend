@@ -6,7 +6,11 @@ import { COLORS } from "@/lib/design/tokens";
 /** Quiet closing line: what the data is, and how fresh it gets. */
 export function SiteFooter() {
   return (
-    <Box component="footer" sx={{ borderTop: "1px solid", borderColor: "divider", mt: 6, py: 3 }}>
+    <Box
+      component="footer"
+      // Hidden on a phone: the bottom navigation owns that edge of the screen.
+      sx={{ display: { xs: "none", md: "block" }, borderTop: "1px solid", borderColor: "divider", mt: 6, py: 3 }}
+    >
       <Container maxWidth="xl" sx={{ px: { xs: 2, md: 3 } }}>
         <Stack
           direction={{ xs: "column", sm: "row" }}

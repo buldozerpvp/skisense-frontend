@@ -39,6 +39,9 @@ export function TopBar() {
       position="sticky"
       elevation={0}
       sx={{
+        // The phone app has its own compact header in MobileShell; this one
+        // would stack a second logo above it.
+        display: { xs: "none", md: "flex" },
         top: 0,
         // Tinted from the canvas so the blur reads in both themes; a fixed
         // white would turn into a bright band in dark mode.
