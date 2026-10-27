@@ -42,6 +42,26 @@ export interface PriceRow {
   /** How many people that per-person price assumes sharing; two unless the
    *  operator says otherwise. Multiply to get the booking's total. */
   pax?: number;
+  /** IATA code the package flies from, when the operator states it per offer.
+   *  Absent means "not stated", never "no flight" — see lib/offers/inclusions. */
+  departsFrom?: string;
+  /** Airport transfers, where the offer itself says so. Absent means the
+   *  operator did not state it on this offer, not that there are none. */
+  transfers?: boolean;
+  /** Whether a flight is in the package, where the offer itself says so.
+   *  Absent means "not stated" — never "no flight". */
+  flights?: boolean;
+  /** Carrier on the outbound leg, where the offer names one. */
+  airline?: string;
+  /** Hold baggage per person in kg, as the fare states it. */
+  baggageKg?: number;
+  /** Cabin trolley per person in kg. */
+  cabinKg?: number;
+  /** Days of lift pass bundled into the package, where it says so. */
+  liftPassDays?: number;
+  /** A lift pass is in the package, where the offer says so without naming
+   *  a number of days. */
+  liftPass?: boolean;
   status: OfferStatus;
   /** Deep link to this offer on the operator's own site, when one exists. */
   url?: string;

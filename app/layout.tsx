@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/layout/SiteFooter";
 import { APP_NAME, APP_TAGLINE } from "@/lib/branding";
 import { FONT_STYLESHEET_HREF, themeVariablesCss } from "@/lib/design/tokens";
 import { THEME_INIT_SCRIPT } from "@/lib/design/useThemeMode";
+import { ResortCard } from "@/components/resorts/ResortCard";
 
 // Next picks up app/icon.png, app/apple-icon.png and app/favicon.ico
 // automatically, so the tab icon needs no manual <link> tags here.
@@ -42,6 +43,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </Box>
             <SiteFooter />
           </Box>
+          {/* One card for the whole app: every resort name on every screen
+              opens this same dialog. */}
+          <ResortCard />
         </Providers>
       </body>
     </html>

@@ -16,6 +16,8 @@ import {
   type MobileSort,
 } from "@/lib/mobile/model";
 import { useMobileFilters } from "@/lib/mobile/useMobile";
+import { FLIGHT_FILTER_LABEL, type FlightStatus } from "@/lib/offers/inclusions";
+import { BOARD_ICON, BOARD_LABEL, BOARD_ORDER, type BoardBasis } from "@/lib/offers/board";
 import { ValuePicker } from "./ValuePicker";
 
 const TYPES: PropertyType[] = ["hotel", "club", "apartment", "chalet"];
@@ -169,6 +171,49 @@ export function FilterSheet({
               value={filters.hotels ? `${filters.hotels.length} selected` : "Any"}
               onClick={() => setPicker("hotel")}
             />
+
+            {/* First, because it changes the result set more than anything
+                else here: six operators, and two of them do not sell a
+                flight at all. */}
+            <Section label="Package">
+              <ChipGroup>
+                {(["included", "land-only", "unknown"] as FlightStatus[]).map((state) => (
+                  <Chip
+                    key={state}
+                    label={FLIGHT_FILTER_LABEL[state]}
+                    on={filters.flights?.includes(state) ?? false}
+                    onClick={() => {
+                      const base = filters.flights ?? [];
+                      const next = base.includes(state) ? base.filter((f) => f !== state) : [...base, state];
+                      set({ flights: next.length === 0 || next.length === 3 ? null : next });
+                    }}
+                  />
+                ))}
+                <Chip label="Show all" on={filters.flights === null} onClick={() => set({ flights: null })} />
+              </ChipGroup>
+              <Typography sx={{ mt: 1, fontSize: 10.5, color: COLORS.inkFaint, lineHeight: 1.5 }}>
+                Issta, Club Med, Pingwin and Skideal sell the flight with the week. Belambra is accommodation
+                only, and Ofir Tours includes it on some packages but not all.
+              </Typography>
+            </Section>
+
+            <Section label="Meals">
+              <ChipGroup>
+                {BOARD_ORDER.map((board) => (
+                  <Chip
+                    key={board}
+                    label={`${BOARD_ICON[board]} ${BOARD_LABEL[board]}`}
+                    on={filters.board?.includes(board) ?? false}
+                    onClick={() => {
+                      const base = filters.board ?? [];
+                      const next = base.includes(board) ? base.filter((b) => b !== board) : [...base, board];
+                      set({ board: next.length === 0 || next.length === BOARD_ORDER.length ? null : (next as BoardBasis[]) });
+                    }}
+                  />
+                ))}
+                <Chip label="Any" on={filters.board === null} onClick={() => set({ board: null })} />
+              </ChipGroup>
+            </Section>
 
             <Section label="Country">
               <ChipGroup>

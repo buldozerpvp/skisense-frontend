@@ -47,7 +47,9 @@ const nextConfig: NextConfig = {
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' data: https://fonts.gstatic.com",
-              "img-src 'self' data: blob:",
+              // Resort photos come from Wikimedia Commons and map tiles from
+              // OpenStreetMap; both are images only, no script.
+              "img-src 'self' data: blob: https://commons.wikimedia.org https://upload.wikimedia.org https://*.tile.openstreetmap.org",
               // The operators' own sites, opened from the Open column.
               "form-action 'self'",
               "frame-ancestors 'none'",

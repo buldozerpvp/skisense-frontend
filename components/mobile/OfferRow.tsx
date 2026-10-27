@@ -4,6 +4,8 @@ import { Box, Stack, Typography } from "@mui/material";
 import { COLORS, FONT_DISPLAY } from "@/lib/design/tokens";
 import { PROPERTY_TYPE_ICON } from "@/lib/table/hotels";
 import { shortDeparture, type MobileOffer } from "@/lib/mobile/model";
+import { useResortCard } from "@/lib/resorts/useResortCard";
+import { BOARD_ICON, BOARD_LABEL, roomShort } from "@/lib/offers/board";
 
 /** Aqua for cheaper, red for pricier — the same pair the charts use. */
 export function changeColor(pct: number | null): string {
@@ -46,9 +48,15 @@ export function OfferRow({
       : offer.brandName;
   return (
     <Box
-      component="button"
-      type="button"
+      role="button"
+      tabIndex={0}
       onClick={() => onOpen(offer)}
+      onKeyDown={(event: React.KeyboardEvent) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(offer);
+        }
+      }}
       sx={{
         width: "100%",
         display: "grid",
@@ -65,8 +73,36 @@ export function OfferRow({
         cursor: "pointer",
       }}
     >
+      {/* The row opens the offer; the resort name opens the resort. Nested
+          targets, so the tap area for the name is kept deliberately tight. */}
       <Typography sx={{ fontSize: 14, fontWeight: 600, color: COLORS.ink }}>
-        {offer.resort} {offer.flag}
+        <Box
+          component="span"
+          role="button"
+          tabIndex={0}
+          aria-label={`About ${offer.resort}`}
+          onClick={(event: React.MouseEvent) => {
+            event.stopPropagation();
+            useResortCard.getState().open(offer.resortKey, offer.resort);
+          }}
+          onKeyDown={(event: React.KeyboardEvent) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.stopPropagation();
+              event.preventDefault();
+              useResortCard.getState().open(offer.resortKey, offer.resort);
+            }
+          }}
+          sx={{
+            cursor: "pointer",
+            textDecoration: "underline",
+            textDecorationStyle: "dotted",
+            textDecorationColor: COLORS.borderStrong,
+            textUnderlineOffset: 3,
+          }}
+        >
+          {offer.resort}
+        </Box>{" "}
+        {offer.flag}
       </Typography>
 
       <Box sx={{ gridRow: "span 2", textAlign: "right" }}>
@@ -88,8 +124,9 @@ export function OfferRow({
       </Box>
 
       <Typography noWrap sx={{ fontSize: 11.5, color: COLORS.inkMuted, minWidth: 0 }}>
-        {PROPERTY_TYPE_ICON[offer.propertyType]} {property} · {shortDeparture(offer.departure)} · {nights} · 👥
-        {offer.pax}
+        {PROPERTY_TYPE_ICON[offer.propertyType]} {property} · {shortDeparture(offer.departure)} · {nights} ·{" "}
+        {offer.board === "unknown" ? "meals ?" : `${BOARD_ICON[offer.board]} ${BOARD_LABEL[offer.board].toLowerCase()}`} ·{" "}
+        {roomShort(offer.pax)}
       </Typography>
     </Box>
   );

@@ -14,6 +14,8 @@ import {
   type MobileOffer,
 } from "@/lib/mobile/model";
 import { useFilterValues, useMobileData, useMobileFilters } from "@/lib/mobile/useMobile";
+import { FLIGHT_FILTER_LABEL } from "@/lib/offers/inclusions";
+import { BOARD_LABEL } from "@/lib/offers/board";
 import { ChipRow, CountBar, FilterChip, SearchBar } from "./SearchBar";
 import { FilterSheet } from "./FilterSheet";
 import { OfferRow, OfferRowSkeleton } from "./OfferRow";
@@ -57,7 +59,7 @@ export function MobileOffers() {
         placeholder="Search resort or hotel"
       />
 
-      {activeCount > 0 && <ActiveChips filters={filters} />}
+      <ActiveChips filters={filters} />
 
       <CountBar
         left={`${SORT_LABEL[filters.sort]} first`}
@@ -144,6 +146,15 @@ export function ActiveChips({ filters }: { filters: MobileFilters }) {
   const set = useMobileFilters((state) => state.set);
   const chips: { label: string; clear: () => void }[] = [];
 
+  // Always first, and always shown even at its default: it is on when you
+  // arrive and it hides a fifth of the rows, so it cannot be silent.
+  if (filters.flights) {
+    chips.push({
+      label: filters.flights.map((state) => FLIGHT_FILTER_LABEL[state]).join(", "),
+      clear: () => set({ flights: null }),
+    });
+  }
+
   if (filters.resorts) chips.push({ label: `${filters.resorts.length} resorts`, clear: () => set({ resorts: null }) });
   if (filters.hotels) chips.push({ label: `${filters.hotels.length} hotels`, clear: () => set({ hotels: null }) });
   if (filters.countries) chips.push({ label: `${filters.countries.length} countries`, clear: () => set({ countries: null }) });
@@ -153,6 +164,9 @@ export function ActiveChips({ filters }: { filters: MobileFilters }) {
       label: filters.types.length ? filters.types.map((type) => PROPERTY_TYPE_LABEL[type]).join(", ") : "No type",
       clear: () => set({ types: DEFAULT_FILTERS.types }),
     });
+  }
+  if (filters.board) {
+    chips.push({ label: filters.board.map((b) => BOARD_LABEL[b]).join(", "), clear: () => set({ board: null }) });
   }
   if (filters.party !== "any") chips.push({ label: `${filters.party} people`, clear: () => set({ party: "any" }) });
   if (filters.nights) chips.push({ label: filters.nights.map((n) => `${n}n`).join(", "), clear: () => set({ nights: null }) });

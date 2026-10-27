@@ -33,6 +33,9 @@ import {
   type PartyChoice,
 } from "@/lib/table/pricing";
 import { countryBadge } from "@/lib/table/countries";
+import { useResortCard } from "@/lib/resorts/useResortCard";
+import { FLIGHT_FILTER_LABEL, flightStatus, inclusionsFor, type FlightStatus } from "@/lib/offers/inclusions";
+import { BOARD_ICON, BOARD_LABEL, BOARD_ORDER, boardFor, type BoardBasis } from "@/lib/offers/board";
 import {
   DEFAULT_PROPERTY_TYPES,
   PROPERTY_TYPE_ICON,
@@ -88,6 +91,10 @@ const DEFAULT_SORTING: MRT_SortingState = [{ id: "date", desc: false }];
  */
 const DEFAULT_FILTERS: MRT_ColumnFiltersState = [
   { id: "propertyType", value: DEFAULT_PROPERTY_TYPES },
+  // Most visitors are flying from Tel Aviv, so the table opens on the
+  // packages that carry the flight. Belambra (accommodation only) and the
+  // Ofir Tours rows whose inclusions vary sit behind one click.
+  { id: "flights", value: ["included"] satisfies FlightStatus[] },
 ];
 
 const DAY_MS = 86_400_000;
@@ -326,7 +333,30 @@ export function BrandsTable() {
           const badge = countryBadge(row.original.country);
           return (
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
-              <Box component="span" sx={{ minWidth: 0 }}>
+              {/* The name is the handle for the resort card: photo, where it
+                  is, and how much piste and snow it has. */}
+              <Box
+                component="button"
+                type="button"
+                onClick={(event: React.MouseEvent) => {
+                  event.stopPropagation();
+                  useResortCard.getState().open(row.original.resortKey, row.original.resort);
+                }}
+                sx={{
+                  minWidth: 0,
+                  p: 0,
+                  border: "none",
+                  bgcolor: "transparent",
+                  color: "inherit",
+                  font: "inherit",
+                  textAlign: "left",
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                  textDecorationColor: "transparent",
+                  textUnderlineOffset: 3,
+                  "&:hover": { textDecorationColor: COLORS.brand },
+                }}
+              >
                 {row.original.resort}
               </Box>
               <Tooltip title={badge.name}>
@@ -569,6 +599,62 @@ export function BrandsTable() {
               >
                 <OpenInNewRoundedIcon fontSize="small" />
               </IconButton>
+            </Tooltip>
+          );
+        },
+      },
+      {
+        id: "board",
+        header: "Meals",
+        size: 140,
+        accessorFn: (row) => boardFor(row.brandSlug, row.board),
+        filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
+        Filter: ({ column }) => (
+          <MultiSelectFilter
+            column={column}
+            options={BOARD_ORDER.map((board) => ({ label: BOARD_LABEL[board], value: board }))}
+          />
+        ),
+        // The operator's own words on hover: "ארוחת בוקר" and "Half board"
+        // are the same thing, and only one of them is in the row.
+        Cell: ({ row }) => {
+          const board = boardFor(row.original.brandSlug, row.original.board) as BoardBasis;
+          return (
+            <Tooltip title={row.original.board ?? "The operator does not state the board on this offer."}>
+              <Box component="span" sx={{ fontSize: 12.5, color: board === "unknown" ? COLORS.inkFaint : COLORS.ink }}>
+                {BOARD_ICON[board]} {BOARD_LABEL[board]}
+              </Box>
+            </Tooltip>
+          );
+        },
+      },
+      {
+        id: "flights",
+        header: "Package",
+        size: 150,
+        accessorFn: (row) => flightStatus(row.brandSlug, row.flights),
+        filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
+        Filter: ({ column }) => (
+          <MultiSelectFilter
+            column={column}
+            options={(["included", "land-only", "unknown"] as FlightStatus[]).map((state) => ({
+              label: FLIGHT_FILTER_LABEL[state],
+              value: state,
+            }))}
+          />
+        ),
+        // What the price buys, in one cell: the operator's own answer on
+        // flights, with the detail on hover.
+        Cell: ({ row }) => {
+          const state = flightStatus(row.original.brandSlug, row.original.flights);
+          const detail = inclusionsFor(row.original.brandSlug);
+          const colour =
+            state === "included" ? COLORS.positive : state === "land-only" ? COLORS.inkMuted : COLORS.accent;
+          return (
+            <Tooltip title={detail?.note ?? "We have not established what this price includes."}>
+              <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, color: colour, fontSize: 12.5 }}>
+                {state === "included" ? "✈" : state === "land-only" ? "🏨" : "?"} {FLIGHT_FILTER_LABEL[state]}
+              </Box>
             </Tooltip>
           );
         },

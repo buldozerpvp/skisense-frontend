@@ -5,6 +5,8 @@ import { countryBadge } from "@/lib/table/countries";
 import { hotelLabelOf, hotelLabels, propertyTypeOf } from "@/lib/table/hotels";
 import { paxOf, totalPrice, type PartyChoice } from "@/lib/table/pricing";
 import { matchesQuery } from "@/lib/table/search";
+import { flightStatus, type FlightStatus, type StatedInclusions } from "@/lib/offers/inclusions";
+import { boardFor, type BoardBasis } from "@/lib/offers/board";
 
 /**
  * One offer, flattened for a phone.
@@ -40,6 +42,16 @@ export interface MobileOffer {
   isNew: boolean;
   status: OfferStatus;
   url?: string;
+  /** Whether this operator's price carries a flight. See lib/offers/inclusions. */
+  flights: FlightStatus;
+  /** Which meals are in the price, normalised across operators. */
+  board: BoardBasis;
+  /** The operator's own words for the board, kept for the offer sheet. */
+  boardRaw?: string;
+  /** What this offer's own page said about flights, transfers and lift pass,
+   *  where it said anything. The sheet shows the detail; the filter above
+   *  only needs the three-state answer. */
+  stated: StatedInclusions;
 }
 
 /** Identity used by the home model, rebuilt here so changes can be looked up. */
@@ -104,6 +116,22 @@ export function buildMobileOffers(
         isNew: move?.isNew ?? false,
         status: row.status,
         url: row.url,
+        flights: flightStatus(entry.source, row.flights),
+        board: boardFor(entry.source, row.board),
+        boardRaw: row.board,
+        // What the offer's own page stated, where it did. Passed through
+        // rather than folded in here: the sheet shows the detail, the filter
+        // only needs the three-state answer above.
+        stated: {
+          ...(row.flights !== undefined ? { flights: row.flights } : {}),
+          ...(row.transfers !== undefined ? { transfers: row.transfers } : {}),
+          ...(row.departsFrom ? { departsFrom: row.departsFrom } : {}),
+          ...(row.airline ? { airline: row.airline } : {}),
+          ...(row.baggageKg !== undefined ? { baggageKg: row.baggageKg } : {}),
+          ...(row.cabinKg !== undefined ? { cabinKg: row.cabinKg } : {}),
+          ...(row.liftPassDays !== undefined ? { liftPassDays: row.liftPassDays } : {}),
+          ...(row.liftPass !== undefined ? { liftPass: row.liftPass } : {}),
+        },
       });
     }
   }
@@ -141,6 +169,10 @@ export interface MobileFilters {
   maxPerPerson: number | null;
   change: "any" | "down" | "up";
   status: "any" | "new";
+  /** Which package kinds to show. Defaults to flight-inclusive ones. */
+  flights: FlightStatus[] | null;
+  /** Which board bases to show. Null is all of them. */
+  board: BoardBasis[] | null;
   sort: MobileSort;
 }
 
@@ -160,6 +192,11 @@ export const DEFAULT_FILTERS: MobileFilters = {
   maxPerPerson: null,
   change: "any",
   status: "any",
+  // Most people here are flying from Tel Aviv, so the opening view is the
+  // packages that include the flight. It is a filter, not a hiding place:
+  // the chip row always shows it and one tap widens to everything.
+  flights: ["included"],
+  board: null,
   sort: "cheapest",
 };
 
@@ -176,7 +213,7 @@ function isActive(filters: MobileFilters, field: keyof MobileFilters): boolean {
 /** Fields the chip row and the badge count. Query and sort are shown separately. */
 const COUNTED: (keyof MobileFilters)[] = [
   "resorts", "hotels", "countries", "brands", "types",
-  "party", "nights", "from", "to", "maxTotal", "maxPerPerson", "change", "status",
+  "party", "nights", "from", "to", "maxTotal", "maxPerPerson", "change", "status", "flights", "board",
 ];
 
 export function activeFilterCount(filters: MobileFilters): number {
@@ -213,6 +250,8 @@ export function filterMobileOffers(offers: MobileOffer[], filters: MobileFilters
     if (filters.change === "down" && !(offer.pct !== null && offer.pct < 0)) return false;
     if (filters.change === "up" && !(offer.pct !== null && offer.pct > 0)) return false;
     if (filters.status === "new" && !offer.isNew) return false;
+    if (filters.flights && !filters.flights.includes(offer.flights)) return false;
+    if (filters.board && !filters.board.includes(offer.board)) return false;
     if (filters.query && !matchesQuery(filters.query, offer.resort, offer.hotel, offer.brandName, offer.countryName))
       return false;
     return true;

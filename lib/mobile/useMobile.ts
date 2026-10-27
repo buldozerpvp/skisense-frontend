@@ -73,12 +73,14 @@ export function useFilterValues(): MobileFilters {
       maxPerPerson: store.maxPerPerson,
       change: store.change,
       status: store.status,
+      flights: store.flights,
+      board: store.board,
       sort: store.sort,
     }),
     [
       store.query, store.resorts, store.hotels, store.countries, store.brands,
       store.types, store.party, store.nights, store.from, store.to,
-      store.maxTotal, store.maxPerPerson, store.change, store.status, store.sort,
+      store.maxTotal, store.maxPerPerson, store.change, store.status, store.flights, store.board, store.sort,
     ]
   );
 }

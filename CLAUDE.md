@@ -124,6 +124,75 @@ brings its own header and bottom bar.
   hue at varying weight — the aqua/red pair means price *change*, and a dear
   month is not a month that rose.
 
+## The resort card
+
+Every resort name — in the phone list, in the offer sheet, in the desktop
+table — opens one dialog (`components/resorts/ResortCard.tsx`), mounted once in
+`app/layout.tsx` and opened through the `useResortCard` store rather than
+threaded down as props.
+
+- **`lib/resorts/resort-info.ts`** is the catalogue, keyed by `resortKey`, with
+  a photo, coordinates, a one-line description and the stats. Every field is
+  optional and a missing figure renders a dash: "we don't know" and "zero" are
+  different statements, and a resort with no photo still gets a usable card.
+- **Photos are Wikimedia Commons files** chosen for a snowy wide shot. The
+  credit line under the picture is the licence condition, not decoration —
+  don't remove it. `buildPhotoUrl()` goes through `Special:FilePath`, which
+  redirects to upload.wikimedia.org, so both hosts are in the CSP's `img-src`.
+- **Two statistics caveats, written up in the file's header.** `pisteKm` for a
+  resort inside a linked area is its own sector where a source separates it and
+  the whole domain where none does (`linkedArea` names it); Les Gets and
+  Morzine overlap and must not be added. `snowfallCm` comes from OnTheSnow's
+  report-built averages, which undercount, and is left out entirely for
+  Bulgaria, Andorra, Georgia and North Macedonia where the published figures
+  are plainly reporting gaps. The card says so under the number.
+- **The map is Leaflet with OpenStreetMap tiles**, imported dynamically because
+  Leaflet touches `window` as it initialises. The marker is a `circleMarker`,
+  not the default pin — the pin is a PNG inside the package and goes missing
+  behind a rewritten asset path. Dark mode inverts the tile pane and spins the
+  hue back rather than adding a second tile provider. `invalidateSize()` after
+  a tick is required: the container is sized by CSS, which Leaflet cannot see
+  during the first paint.
+- Satellite villages (Arc 1800, Arc 2000, Peisey-Vallandry, Marilleva) carry
+  `sharesCardWith` and show their parent's card under their own name.
+
+## Hotel photos
+
+The offer sheet opens with a `PhotoCarousel` (`components/resorts/`): swipe or
+tap the arrows, tap a photo for full screen with arrow-key paging. Paging is
+CSS scroll-snap, not a carousel library, and the dots follow the scroll offset
+rather than the last button pressed.
+
+What feeds it is the hard part. **`lib/resorts/hotel-photos.ts` holds five
+properties out of sixty-nine.** Freely-licensed photography of a three-star ski
+hotel barely exists: a mountain is shot by thousands of visitors who upload
+under open licences, a hotel's pictures are shot by the hotel. A full Commons
+sweep matched English pubs called The Lion Hotel, a Marco Polo in Hong Kong,
+icebergs in Greenland and a Styrian town hall. Every entry in that file was
+confirmed by eye; **never add one on a name match**, because a wrong hotel
+photo is a picture of a building the traveller will not be staying in, shown
+beside the price they might pay for it.
+
+Where a property has no photo of its own, its slot is taken by `HotelMap` —
+a small inert map of where the place stands, tappable to a full-screen one you
+can pan and zoom. That is the other thing you want to know about a hotel and
+the one we can source honestly; a photo of the valley in the hotel's slot
+would be a lie with a price next to it.
+
+**`lib/resorts/hotel-places.ts` has building-level coordinates for 22 of the
+69 properties**, geocoded through Nominatim and filtered twice: anything over
+20 km from its resort was dropped (that is what stops "Rila" in Borovets
+landing on the Rila Monastery), and so was any result whose OSM type was not
+somewhere you can sleep — the raw sweep offered a drinking fountain, a
+ski-lift pylon, a cinema and a deli counter. The other 47 fall back to the
+resort centre and the caption says the pin is approximate. Do not remove that
+caption to make the card look tidier.
+
+Filling this out properly needs a licensed source — an affiliate content API
+(Booking.com, Expedia) grants display rights, as does the hotels' own
+permission, or photographs taken by whoever runs the site. The carousel reads
+whatever that map holds, so adding a source later is a data job, not a UI one.
+
 ## The offers table
 
 - **Hotels.** Rows share a `hotelKey` when they are the same property across
@@ -143,6 +212,72 @@ brings its own header and bottom bar.
 - Country is shown by default, Status hidden (a Club Med urgency flag the
   other five never set). Visibility is state with a setter - passing a memo
   into `state` freezes the show/hide panel.
+
+## Board basis and room occupancy
+
+`lib/offers/board.ts` maps every spelling the six operators use —
+`ארוחת בוקר`, `Half board`, `DPIND`, nothing at all — onto one scale
+(room-only / breakfast / half-board / full-board / all-inclusive / unknown).
+`unknown` is shown as "meals ?" rather than guessed: breakfast printed on a
+room-only price is the kind of error someone books on.
+
+- **Ofir Tours** prints the board on the card, in the span straight after the
+  nights span. The old regex also swallowed the transfers badge and the party
+  string, which is why stored snapshots have `board: "3 מבוגרים"` — fixed with
+  a reject list, and the card's transfers badge is now stored too.
+- **Club Med** states no board per offer and needs none: its winter villages
+  are all-inclusive by construction, so that is a source-level default.
+- **Belambra** already carries board codes; `AIIND`, `DPIND`, `DPRMIND`,
+  `PCRMIND`, `LOC` all map.
+- **Issta is genuinely unknown per offer, and the reason is worth knowing.**
+  Their feed has no board field, and the several rows a hotel has for one date
+  — identical but for price — are **board baskets, not room grades**: for
+  Vihren on 2027-01-28, the 1,009 and 1,079 per person match the breakfast and
+  half-board grand totals exactly. `basisid=0` in the deep link means
+  *breakfast*, not "any basis" (checked live), so the link can land on a board
+  the price does not belong to. Boards could be recovered by matching prices
+  against a details page per basket shape — not per offer — but that is not
+  built.
+
+Room occupancy is `pax`: the party the operator priced, not a capacity. The
+sheet says so, because an offer sold for three is a different product from the
+same room sold for two, never that price divided.
+
+## What a price includes
+
+Six operators quote a number for the same week and mean different things by
+it, and none of them publish an "includes flights" field. `lib/offers/
+inclusions.ts` records the answer per operator, with the evidence, in three
+states — and `unknown` is a real state, because a wrong flight badge is one
+someone books on.
+
+- **Issta** and **Club Med**: flights from Tel Aviv, transfers and a lift pass,
+  high confidence. Club Med was settled by experiment rather than by reading:
+  the same calendar call for Tignes returns €5,660–5,836 varying by date with
+  `departureCity: "TLV"` and a flat €4,802 for every date without it. Only a
+  flight prices by date. Issta's own feed carries `DepartureCode: "TLV"` and
+  `PackageType: 1` on all 605 live options, now stored per row as
+  `departsFrom`.
+- **Pingwin** and **Skideal**: flight and transfers included, lift pass varies.
+  Pingwin sells some departures from **Haifa**, and Skideal never states a
+  departure airport anywhere on its site — so neither gets an unqualified
+  "from Tel Aviv".
+- **Ofir Tours**: transfers on every listing, flights only on "full packages"
+  by their own wording. Classified `unknown`, not `included`.
+- **Belambra**: accommodation only. Their search has no departure city at all,
+  so the price cannot vary by where you start.
+
+**The offers list opens filtered to flight-inclusive packages**, on both the
+phone and the table. That hides about a fifth of the rows, so the chip for it
+is always rendered even at its default — a default-on filter that is invisible
+is a bug report waiting to happen.
+
+Two unresolved data issues this turned up, both in the backend:
+Belambra's self-catering (`LOC`) rows are priced **per accommodation**, not
+per person, so they are stored in the wrong unit and undercut every other
+operator; and Club Med's stored prices jumped ~40% between the 17 Oct snapshot
+and a live call, which is either an October sale or a collection fault and is
+worth a look.
 
 ## Charts — house rules
 
