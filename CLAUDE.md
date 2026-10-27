@@ -267,6 +267,20 @@ someone books on.
 - **Belambra**: accommodation only. Their search has no departure city at all,
   so the price cannot vary by where you start.
 
+**The offer's own page beats its operator's habit.** `offerInclusions(source,
+offer.stated)` starts from the table above and overwrites whatever that one
+offer actually stated — Ophir's promotion pages name both legs, the airline,
+the baggage in the fare and the days of lift pass, so those rows answer
+"flights included, from Tel Aviv" instead of inheriting the cautious `varies`
+their cards earn. Stating anything lifts that offer's confidence to high: it
+was read off the page the shopper is about to open. An unstated field is still
+unstated — `flightStatus(source, undefined)` falls back to the operator.
+
+**Skideal links are per resort.** `/site/<resort>/` is the only page that
+lists departures; the package permalink and `/hotel/<slug>/` both render site
+chrome and nothing to book (checked live 2026-10-27). Rows collected before
+that date still carry the old links until the collector re-runs.
+
 **The offers list opens filtered to flight-inclusive packages**, on both the
 phone and the table. That hides about a fifth of the rows, so the chip for it
 is always rendered even at its default — a default-on filter that is invisible

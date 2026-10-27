@@ -55,14 +55,34 @@ export const BOARD_ORDER: BoardBasis[] = [
 ];
 
 // Hebrew from the Israeli operators, English and board codes from Belambra.
-// Longest, most specific patterns first: "חצי פנסיון" must be tested before
-// "פנסיון", and "half board + lifts" before "half board".
+//
+// Order is the whole trick: these are tested top to bottom and the first hit
+// wins, so every pattern must be more specific than the ones below it.
+// "ארוחות בוקר וערב" (breakfast and dinner) is half board and contains the
+// word for breakfast — tested after the breakfast line it reads as breakfast,
+// and dinner quietly disappears from the price. Likewise "ארוחות בוקר,
+// צהריים וערב" is full board and contains both of the others.
+//
+// The operators also write the same meal several ways: Skideal pluralises
+// ("ארוחות בוקר") and adds where it is served ("במלון", "בקלאב", "במסעדה
+// כשרה"), Issta hyphenates ("ארוחת-בוקר") and marks kosher half board
+// ("חצי פנסיון כשר"), and its package list says it in English as "B&B". All
+// of those are the same four or five things.
 const PATTERNS: [RegExp, BoardBasis][] = [
   [/הכל\s*כלול|all\s*inclusive|^AIIND$/i, "all-inclusive"],
-  [/חצי\s*פנסיון|half\s*board|^DP(RM)?IND$/i, "half-board"],
-  [/פנסיון\s*מלא|full\s*board|^PC(RM)?IND$/i, "full-board"],
-  [/ארוחת\s*בוקר|לינה\s*וארוחת|bed\s*(and|&)\s*breakfast|breakfast|^BB$/i, "breakfast"],
-  [/לינה\s*בלבד|room\s*only|self[-\s]?catering|^LOC$/i, "room-only"],
+  [
+    /בוקר\s*,?\s*צהריים\s*וערב|פנסיון\s*מלא|full\s*board|^FB$|^PC(RM)?IND$/i,
+    "full-board",
+  ],
+  [
+    /חצי\s*פנסיון|בוקר\s*וערב|half\s*board|^HB$|^DP(RM)?IND$/i,
+    "half-board",
+  ],
+  [
+    /ארוחו?ת[\s-]*בוקר|לינה\s*וארוחת|bed\s*(and|&)\s*breakfast|B\s*&\s*B|breakfast|^BB$/i,
+    "breakfast",
+  ],
+  [/לינה\s*בלב|room\s*only|self[-\s]?catering|^LOC$/i, "room-only"],
 ];
 
 /**
