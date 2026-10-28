@@ -49,7 +49,14 @@ const nextConfig: NextConfig = {
               "font-src 'self' data: https://fonts.gstatic.com",
               // Resort photos come from Wikimedia Commons and map tiles from
               // OpenStreetMap; both are images only, no script.
-              "img-src 'self' data: blob: https://commons.wikimedia.org https://upload.wikimedia.org https://*.tile.openstreetmap.org",
+              // Wikimedia serves a Commons photo from whichever host it
+              // feels like: `Special:FilePath` used to redirect to
+              // upload.wikimedia.org and now lands on thumb.wikimedia.org.
+              // Only the first was allowed, so every resort photo was blocked
+              // by our own header and the card showed a grey panel. Any
+              // wikimedia.org host is allowed now rather than a list that
+              // silently rots the next time they move the files.
+              "img-src 'self' data: blob: https://*.wikimedia.org https://*.tile.openstreetmap.org",
               // The operators' own sites, opened from the Open column.
               "form-action 'self'",
               "frame-ancestors 'none'",

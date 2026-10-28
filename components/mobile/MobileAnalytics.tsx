@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Box, Stack, Typography } from "@mui/material";
-import { COLORS, FONT_DISPLAY } from "@/lib/design/tokens";
+import { COLORS, FONT_DISPLAY, RADIUS } from "@/lib/design/tokens";
 import { activeFilterCount, type MobileOffer } from "@/lib/mobile/model";
 import { useFilterValues, useMobileData } from "@/lib/mobile/useMobile";
 import { ActiveChips } from "./MobileOffers";
@@ -201,7 +201,7 @@ export function MobileAnalytics() {
                         maxWidth: 34,
                         mx: "auto",
                         height: 30 + heat * 54,
-                        borderRadius: 1.25,
+                        borderRadius: `${RADIUS.sm}px`,
                         bgcolor: COLORS.brand,
                         opacity: 0.4 + heat * 0.6,
                       }}
@@ -230,7 +230,7 @@ export function MobileAnalytics() {
 
 function Card({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
   return (
-    <Box sx={{ p: 1.75, bgcolor: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 4 }}>
+    <Box sx={{ p: 1.75, bgcolor: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: `${RADIUS.lg}px` }}>
       <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: COLORS.ink }}>{title}</Typography>
       <Typography sx={{ mt: 0.3, mb: 1.4, fontSize: 11, color: COLORS.inkFaint }}>{note}</Typography>
       {children}

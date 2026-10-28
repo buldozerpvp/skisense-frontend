@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Box, Drawer, Stack, Typography } from "@mui/material";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import { COLORS, FONT_DISPLAY } from "@/lib/design/tokens";
+import { COLORS, FONT_DISPLAY, RADIUS } from "@/lib/design/tokens";
 import { BRANDS } from "@/lib/brands/config";
 import { PROPERTY_TYPE_ICON, PROPERTY_TYPE_LABEL } from "@/lib/table/hotels";
 import type { PropertyType } from "@/lib/brands/types";
@@ -366,7 +366,7 @@ export function FilterSheet({
               component="button"
               type="button"
               onClick={onClose}
-              sx={{ flexShrink: 0, minHeight: 48, px: 2.2, borderRadius: 3.5, border: `1px solid ${COLORS.borderStrong}`, bgcolor: "transparent", color: COLORS.ink, fontSize: 13.5, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
+              sx={{ flexShrink: 0, minHeight: 48, px: 2.2, borderRadius: `${RADIUS.pill}px`, border: `1px solid ${COLORS.borderStrong}`, bgcolor: "transparent", color: COLORS.ink, fontSize: 13.5, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
             >
               Close
             </Box>
@@ -374,7 +374,7 @@ export function FilterSheet({
               component="button"
               type="button"
               onClick={onClose}
-              sx={{ flex: 1, minHeight: 48, borderRadius: 3.5, border: "none", bgcolor: COLORS.brand, color: COLORS.canvas, fontSize: 14, fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}
+              sx={{ flex: 1, minHeight: 48, borderRadius: `${RADIUS.pill}px`, border: "none", bgcolor: COLORS.brand, color: COLORS.canvas, fontSize: 14, fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}
             >
               Show {resultCount.toLocaleString("en-GB")} offers
             </Box>
@@ -503,7 +503,7 @@ function DateField({ value, onChange, label }: { value: string | null; onChange:
         minWidth: 0,
         minHeight: 44,
         px: 1.5,
-        borderRadius: 3,
+        borderRadius: `${RADIUS.lg}px`,
         border: `1px solid ${COLORS.borderStrong}`,
         bgcolor: "transparent",
         color: value ? COLORS.ink : COLORS.inkMuted,

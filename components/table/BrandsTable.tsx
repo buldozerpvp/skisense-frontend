@@ -47,7 +47,9 @@ import {
 import { MultiSelectFilter, isOneOf } from "./MultiSelectFilter";
 import { shortDate } from "@/lib/analytics/format";
 import { matchesQuery } from "@/lib/table/search";
-import { useLatestOffers } from "@/lib/query/usePrices";
+import { useAllOffers, useLatestOffers } from "@/lib/query/usePrices";
+import { buildMobileOffers, type MobileOffer } from "@/lib/mobile/model";
+import { OfferSheet } from "@/components/mobile/OfferSheet";
 import { useAppStore } from "@/lib/store/useAppStore";
 import { BRANDS, getBrand } from "@/lib/brands/config";
 import type { OfferStatus, PriceRow, PropertyType } from "@/lib/brands/types";
@@ -140,6 +142,12 @@ export function BrandsTable() {
   "use no memo";
 
   const { data, isLoading } = useLatestOffers();
+  // The history behind the drawer's chart. Same query the phone uses, so it
+  // is already cached on a page that has shown the analytics.
+  const history = useAllOffers();
+  // Which row's detail is open, by the offer's own key rather than by index:
+  // a filter or a sort would otherwise hand the drawer a different offer.
+  const [openOfferKey, setOpenOfferKey] = useState<string | null>(null);
   const selectedBrands = useAppStore((s) => s.selectedBrands);
   const searchText = useAppStore((s) => s.searchText);
   const setSearchText = useAppStore((s) => s.setSearchText);
@@ -197,6 +205,16 @@ export function BrandsTable() {
   const rows = useMemo(
     () => matchingRows.filter((row) => fitsParty(row, party)),
     [matchingRows, party]
+  );
+
+  // The detail panel's model. The table's own rows are snapshot rows with a
+  // brand attached; the drawer shows the same tree the phone does, and that
+  // tree is built from MobileOffer — so it is built here once, from the same
+  // data, rather than duplicating a dozen per-row derivations.
+  const detailOffers = useMemo(() => buildMobileOffers(data, history.data), [data, history.data]);
+  const openOffer = useMemo(
+    () => detailOffers.find((offer) => offer.key === openOfferKey) ?? null,
+    [detailOffers, openOfferKey]
   );
 
   // Dropdown options come from the data itself, so new resorts and countries
@@ -771,6 +789,22 @@ export function BrandsTable() {
       },
     },
     muiTableBodyCellProps: { sx: { fontSize: 13.5, px: 1.25 } },
+    // A row is the offer, so the whole row opens it — the same panel the
+    // phone opens on a tap. The resort name inside keeps its own click and
+    // stops propagation, because the resort and the offer are two different
+    // questions and each deserves its own target.
+    muiTableBodyRowProps: ({ row }) => {
+      // Grouping is on, and a group header row carries no offer of its own.
+      const offer = row.original as CombinedOfferRow | undefined;
+      if (!offer?.resortId) return {};
+      return {
+        onClick: () => setOpenOfferKey(offerDetailKey(offer)),
+        sx: {
+          cursor: "pointer",
+          "&:hover td": { bgcolor: COLORS.frost },
+        },
+      };
+    },
     // The column name sits directly above every filter, so repeating it inside
     // the input only made the placeholder truncate.
     muiFilterTextFieldProps: { placeholder: "Filter" },
@@ -839,5 +873,34 @@ export function BrandsTable() {
     ),
   });
 
-  return <MaterialReactTable table={table} />;
+  return (
+    <>
+      <MaterialReactTable table={table} />
+      <OfferSheet
+        offer={openOffer}
+        siblings={detailOffers}
+        surface="drawer"
+        onClose={() => setOpenOfferKey(null)}
+        onPick={(offer: MobileOffer) => setOpenOfferKey(offer.key)}
+      />
+    </>
+  );
+}
+
+/**
+ * The key a table row and its detail agree on.
+ *
+ * Deliberately the same expression `buildMobileOffers` uses for `key`: the
+ * two are built from the same snapshot rows by different paths, and the day
+ * they disagree the drawer opens empty. If one changes, change both.
+ */
+function offerDetailKey(row: CombinedOfferRow): string {
+  return [
+    row.brandSlug,
+    row.resortId,
+    row.hotel ?? "",
+    row.date,
+    row.nights ?? "?",
+    row.priceEur,
+  ].join("|");
 }

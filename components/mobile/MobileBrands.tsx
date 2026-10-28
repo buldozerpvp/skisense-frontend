@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Box, Stack, Typography } from "@mui/material";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import { COLORS, FONT_DISPLAY } from "@/lib/design/tokens";
+import { COLORS, FONT_DISPLAY, RADIUS } from "@/lib/design/tokens";
 import { BRANDS, type Brand } from "@/lib/brands/config";
 import { activeFilterCount, type MobileOffer } from "@/lib/mobile/model";
 import { useFilterValues, useMobileData, useMobileFilters } from "@/lib/mobile/useMobile";
@@ -112,7 +112,7 @@ function BrandCard({ row, narrowed, loading }: { row: BrandRow; narrowed: boolea
         p: 1.75,
         bgcolor: COLORS.surface,
         border: `1px solid ${COLORS.border}`,
-        borderRadius: 4,
+        borderRadius: `${RADIUS.lg}px`,
         textDecoration: "none",
         opacity: empty ? 0.55 : 1,
       }}
@@ -123,7 +123,7 @@ function BrandCard({ row, narrowed, loading }: { row: BrandRow; narrowed: boolea
             flexShrink: 0,
             width: 40,
             height: 40,
-            borderRadius: 2.75,
+            borderRadius: `${RADIUS.md}px`,
             overflow: "hidden",
             bgcolor: brand.logoSrc ? COLORS.frost : brand.color,
             display: "flex",

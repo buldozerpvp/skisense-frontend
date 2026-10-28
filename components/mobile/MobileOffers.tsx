@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Box, Stack, Typography } from "@mui/material";
-import { COLORS } from "@/lib/design/tokens";
+import { COLORS, RADIUS } from "@/lib/design/tokens";
 import { PROPERTY_TYPE_LABEL } from "@/lib/table/hotels";
 import {
   activeFilterCount,
@@ -93,7 +93,7 @@ export function MobileOffers() {
         {/* A short list has to explain itself: without this, a stale filter
             reads as a broken search. */}
         {hiddenByFilters > 0 && (
-          <Box sx={{ m: 2, p: 1.75, bgcolor: COLORS.surface, border: `1px solid ${COLORS.borderStrong}`, borderRadius: 4 }}>
+          <Box sx={{ m: 2, p: 1.75, bgcolor: COLORS.surface, border: `1px solid ${COLORS.borderStrong}`, borderRadius: `${RADIUS.lg}px` }}>
             <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: COLORS.ink }}>
               {hiddenByFilters.toLocaleString("en-GB")} more match “{filters.query}”
             </Typography>
@@ -105,7 +105,7 @@ export function MobileOffers() {
                 component="button"
                 type="button"
                 onClick={() => useMobileFilters.getState().reset()}
-                sx={{ flex: 1, minHeight: 42, borderRadius: 3, border: "none", bgcolor: COLORS.brand, color: COLORS.canvas, fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}
+                sx={{ flex: 1, minHeight: 42, borderRadius: `${RADIUS.md}px`, border: "none", bgcolor: COLORS.brand, color: COLORS.canvas, fontSize: 13, fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}
               >
                 Search all {all.length.toLocaleString("en-GB")}
               </Box>
@@ -113,7 +113,7 @@ export function MobileOffers() {
                 component="button"
                 type="button"
                 onClick={() => setSheetOpen(true)}
-                sx={{ flexShrink: 0, minHeight: 42, px: 1.9, borderRadius: 3, border: `1px solid ${COLORS.borderStrong}`, bgcolor: "transparent", color: COLORS.ink, fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
+                sx={{ flexShrink: 0, minHeight: 42, px: 1.9, borderRadius: `${RADIUS.md}px`, border: `1px solid ${COLORS.borderStrong}`, bgcolor: "transparent", color: COLORS.ink, fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
               >
                 Edit filters
               </Box>
@@ -127,7 +127,7 @@ export function MobileOffers() {
               component="button"
               type="button"
               onClick={() => setLimit((current) => current + PAGE)}
-              sx={{ width: "100%", minHeight: 44, borderRadius: 3, border: `1px solid ${COLORS.borderStrong}`, bgcolor: "transparent", color: COLORS.ink, fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
+              sx={{ width: "100%", minHeight: 44, borderRadius: `${RADIUS.md}px`, border: `1px solid ${COLORS.borderStrong}`, bgcolor: "transparent", color: COLORS.ink, fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
             >
               Show {Math.min(PAGE, visible.length - rows.length)} more
             </Box>

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Box, Stack } from "@mui/material";
-import { COLORS } from "@/lib/design/tokens";
+import { COLORS, RADIUS } from "@/lib/design/tokens";
 import { useIsMobile } from "@/lib/mobile/useMobile";
 import { MobileShell } from "./MobileShell";
 
@@ -21,8 +21,8 @@ export function Responsive({ mobile, desktop }: { mobile: ReactNode; desktop: Re
   if (isMobile === null) {
     return (
       <Stack spacing={1.5} sx={{ p: 2 }} aria-hidden>
-        <Box sx={{ height: 44, borderRadius: 2, bgcolor: COLORS.surface }} />
-        <Box sx={{ height: 180, borderRadius: 3, bgcolor: COLORS.surface }} />
+        <Box sx={{ height: 44, borderRadius: `${RADIUS.md}px`, bgcolor: COLORS.surface }} />
+        <Box sx={{ height: 180, borderRadius: `${RADIUS.lg}px`, bgcolor: COLORS.surface }} />
       </Stack>
     );
   }

@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { Box, Dialog, IconButton, Stack, Typography } from "@mui/material";
+import { Box, Dialog, Drawer, IconButton, Stack, Typography } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
-import { COLORS, FONT_DISPLAY } from "@/lib/design/tokens";
+import { COLORS, FONT_DISPLAY, RADIUS } from "@/lib/design/tokens";
 import { buildSeriesIndex, offerKey } from "@/lib/analytics/derive";
 import { useAllOffers } from "@/lib/query/usePrices";
 import { PROPERTY_TYPE_ICON, PROPERTY_TYPE_LABEL } from "@/lib/table/hotels";
@@ -18,11 +19,23 @@ import { offerInclusions, type Inclusion } from "@/lib/offers/inclusions";
 import { BOARD_DETAIL, BOARD_ICON, BOARD_LABEL, roomLabel } from "@/lib/offers/board";
 import { HotelMap } from "@/components/resorts/HotelMap";
 import { changeColor, changeLabel } from "./OfferRow";
+import { OfferHistory } from "./OfferHistory";
 
 /**
- * One offer, full screen.
+ * Where an offer's detail is shown: full screen on a phone, a panel beside
+ * the table on a desktop.
  *
- * This is where the phone beats the table rather than apologising to it: a
+ * Only the shell differs. Everything inside — the photos or the map, the
+ * price, the history chart, what the price includes, the same hotel at other
+ * operators — is one tree rendered by both, because two copies of this would
+ * have drifted apart by the second change.
+ */
+export type OfferSurface = "sheet" | "drawer";
+
+/**
+ * One offer, in full.
+ *
+ * This is where the detail beats the table rather than apologising to it: a
  * row can show a price, but it cannot show the same hotel at three operators
  * or six nights of history, and those are the two things that decide a booking.
  */
@@ -31,11 +44,14 @@ export function OfferSheet({
   siblings,
   onClose,
   onPick,
+  surface = "sheet",
 }: {
   offer: MobileOffer | null;
   siblings: MobileOffer[];
   onClose: () => void;
   onPick: (offer: MobileOffer) => void;
+  /** "sheet" is the phone's full screen; "drawer" is the desktop panel. */
+  surface?: OfferSurface;
 }) {
   const history = useAllOffers();
 
@@ -79,25 +95,27 @@ export function OfferSheet({
 
   if (!offer) return null;
 
-  const low = points.length ? Math.min(...points.map((point) => point.total)) : offer.total;
-  const peak = points.length ? Math.max(...points.map((point) => point.total)) : offer.total;
+  const drawer = surface === "drawer";
+  // One tree, two shells. The drawer keeps the table visible on the left so
+  // offers can be opened one after another and compared; the phone has no
+  // room for that and takes the screen.
+  const Shell = drawer ? DrawerShell : DialogShell;
 
   return (
-    <Dialog
-      fullScreen
-      open
-      onClose={onClose}
-      slotProps={{ paper: { sx: { bgcolor: COLORS.canvas, backgroundImage: "none" } } }}
-    >
-      <Stack sx={{ height: "100dvh" }}>
+    <Shell onClose={onClose}>
+      <Stack sx={{ height: "100%" }}>
         <Stack
           direction="row"
           spacing={0.5}
           alignItems="center"
           sx={{ px: 1.25, py: 1.1, bgcolor: COLORS.surface, borderBottom: `1px solid ${COLORS.border}` }}
         >
-          <IconButton onClick={onClose} aria-label="Back to the list" sx={{ color: COLORS.ink }}>
-            <ArrowBackRoundedIcon sx={{ fontSize: 20 }} />
+          <IconButton
+            onClick={onClose}
+            aria-label={drawer ? "Close this offer" : "Back to the list"}
+            sx={{ color: COLORS.ink }}
+          >
+            {drawer ? <CloseRoundedIcon sx={{ fontSize: 20 }} /> : <ArrowBackRoundedIcon sx={{ fontSize: 20 }} />}
           </IconButton>
           <Box
             component="button"
@@ -124,7 +142,8 @@ export function OfferSheet({
           </Box>
         </Stack>
 
-        <Box sx={{ flex: 1, overflowY: "auto", WebkitOverflowScrolling: "touch", pb: 2 }}>
+        <Box sx={{ flex: 1, minHeight: 0, position: "relative" }}>
+        <Box sx={{ height: "100%", overflowY: "auto", WebkitOverflowScrolling: "touch", pb: 3 }}>
           {gallery.length > 0 && <PhotoCarousel photos={gallery} height={200} />}
 
           {place && (
@@ -168,48 +187,6 @@ export function OfferSheet({
             </Stack>
           </Box>
 
-          <Card>
-            <Stack direction="row" alignItems="baseline" justifyContent="space-between">
-              <Typography sx={{ fontSize: 12, fontWeight: 600, color: COLORS.ink }}>
-                Since we started watching
-              </Typography>
-              <Typography sx={{ fontSize: 11, color: COLORS.inkMuted }}>
-                {points.length || "…"} {points.length === 1 ? "night" : "nights"}
-              </Typography>
-            </Stack>
-            {points.length > 1 ? (
-              <>
-                <Stack direction="row" spacing="6px" alignItems="flex-end" sx={{ height: 52, mt: 1.4 }} aria-hidden>
-                  {points.map((point, index) => (
-                    <Box
-                      key={point.day}
-                      sx={{
-                        flex: 1,
-                        height: `${peak > 0 ? Math.max((point.total / peak) * 100, 8) : 8}%`,
-                        borderRadius: "3px",
-                        bgcolor: index === points.length - 1 ? changeColor(offer.pct) : COLORS.borderStrong,
-                      }}
-                    />
-                  ))}
-                </Stack>
-                <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.9 }}>
-                  <Typography sx={{ fontSize: 11, color: COLORS.inkFaint }}>
-                    €{low.toLocaleString("en-GB")} low
-                  </Typography>
-                  <Typography sx={{ fontSize: 11, color: COLORS.inkFaint }}>
-                    tonight €{offer.total.toLocaleString("en-GB")}
-                  </Typography>
-                </Stack>
-              </>
-            ) : (
-              <Typography sx={{ mt: 1.2, fontSize: 12, color: COLORS.inkMuted, lineHeight: 1.55 }}>
-                {history.isLoading
-                  ? "Loading the price history…"
-                  : "First seen in tonight's collection — there is nothing earlier to compare it against yet."}
-              </Typography>
-            )}
-          </Card>
-
           <Box sx={{ px: 2, mt: 1.6, display: "flex", flexWrap: "wrap", gap: 0.9 }}>
             <Fact>{shortDeparture(offer.departure)}</Fact>
             {offer.nights && <Fact>{offer.nights} nights</Fact>}
@@ -218,11 +195,23 @@ export function OfferSheet({
             <Fact>{offer.brandName}</Fact>
           </Box>
 
+          <Card>
+            <Stack direction="row" alignItems="baseline" justifyContent="space-between">
+              <Typography sx={{ fontSize: 12, fontWeight: 600, color: COLORS.ink }}>
+                What this offer has cost
+              </Typography>
+              <Typography sx={{ fontSize: 11, color: COLORS.inkMuted }}>
+                {points.length || "…"} {points.length === 1 ? "night" : "nights"} watched
+              </Typography>
+            </Stack>
+            <OfferHistory points={points} isLoading={history.isLoading} />
+          </Card>
+
           {/* What the number actually buys. Without this the cheapest row on
               the screen can be the one that leaves you to book your own
               flight. */}
           {included && (
-            <Box sx={{ mx: 2, mt: 2.2, p: 1.75, bgcolor: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 4 }}>
+            <Box sx={{ mx: 2, mt: 2.2, p: 2, bgcolor: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: `${RADIUS.lg}px` }}>
               <Typography sx={{ mb: 1.1, fontSize: 11, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: COLORS.inkMuted }}>
                 In the price
               </Typography>
@@ -295,7 +284,7 @@ export function OfferSheet({
               <Typography sx={{ mb: 1.1, fontSize: 11, fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: COLORS.inkMuted }}>
                 Same hotel, other operators
               </Typography>
-              <Box sx={{ border: `1px solid ${COLORS.border}`, borderRadius: 4, overflow: "hidden", bgcolor: COLORS.surface }}>
+              <Box sx={{ border: `1px solid ${COLORS.border}`, borderRadius: `${RADIUS.lg}px`, overflow: "hidden", bgcolor: COLORS.surface }}>
                 {others.map((other, index) => {
                   const diff = other.total - offer.total;
                   return (
@@ -346,6 +335,24 @@ export function OfferSheet({
           )}
         </Box>
 
+        {/* A card that stops dead at the action bar reads as clipped rather
+            than as "there is more below". The fade belongs to the scroll
+            frame, not to the scrolling content, so it stays put while the
+            cards move under it. */}
+        <Box
+          aria-hidden
+          sx={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 28,
+            pointerEvents: "none",
+            background: `linear-gradient(to bottom, color-mix(in srgb, ${COLORS.canvas} 0%, transparent), ${COLORS.canvas})`,
+          }}
+        />
+        </Box>
+
         <Box sx={{ px: 2, pt: 1.3, pb: "calc(16px + env(safe-area-inset-bottom))", borderTop: `1px solid ${COLORS.border}`, bgcolor: COLORS.canvas }}>
           <Box
             component={offer.url ? "a" : "button"}
@@ -357,7 +364,7 @@ export function OfferSheet({
               alignItems: "center",
               justifyContent: "center",
               gap: 0.75,
-              borderRadius: 3.5,
+              borderRadius: `${RADIUS.pill}px`,
               border: "none",
               textDecoration: "none",
               bgcolor: offer.url ? COLORS.brand : COLORS.border,
@@ -373,7 +380,51 @@ export function OfferSheet({
           </Box>
         </Box>
       </Stack>
+    </Shell>
+  );
+}
+
+/** The phone: the offer takes the screen, because there is nothing to keep. */
+function DialogShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  return (
+    <Dialog
+      fullScreen
+      open
+      onClose={onClose}
+      slotProps={{ paper: { sx: { bgcolor: COLORS.canvas, backgroundImage: "none", height: "100dvh" } } }}
+    >
+      {children}
     </Dialog>
+  );
+}
+
+/**
+ * The desktop: a panel on the right, with the table still readable beside it.
+ *
+ * Its width is capped rather than proportional — the content is one column of
+ * cards designed at phone width, and stretching it to half a 27-inch monitor
+ * would leave a photo three feet wide above two lines of text.
+ */
+function DrawerShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+  return (
+    <Drawer
+      anchor="right"
+      open
+      onClose={onClose}
+      slotProps={{
+        paper: {
+          sx: {
+            width: { xs: "100vw", sm: 440 },
+            maxWidth: "100vw",
+            bgcolor: COLORS.canvas,
+            backgroundImage: "none",
+            borderLeft: `1px solid ${COLORS.border}`,
+          },
+        },
+      }}
+    >
+      {children}
+    </Drawer>
   );
 }
 
@@ -411,7 +462,7 @@ function Line({ state, label, suffix = true }: { state: Inclusion; label: string
 
 function Card({ children }: { children: React.ReactNode }) {
   return (
-    <Box sx={{ mx: 2, p: 1.75, bgcolor: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 4 }}>
+    <Box sx={{ mx: 2, p: 2, bgcolor: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: `${RADIUS.lg}px` }}>
       {children}
     </Box>
   );

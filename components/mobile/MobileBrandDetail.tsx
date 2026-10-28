@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Box, IconButton, Stack, Typography } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import { COLORS, FONT_DISPLAY } from "@/lib/design/tokens";
+import { COLORS, FONT_DISPLAY, RADIUS } from "@/lib/design/tokens";
 import type { Brand } from "@/lib/brands/config";
 import { activeFilterCount, filterMobileOffers, type MobileOffer } from "@/lib/mobile/model";
 import { useFilterValues, useMobileData, useMobileFilters } from "@/lib/mobile/useMobile";
@@ -63,7 +63,7 @@ export function MobileBrandDetail({ brand }: { brand: Brand }) {
           sx={{
             width: 30,
             height: 30,
-            borderRadius: 2.25,
+            borderRadius: `${RADIUS.md}px`,
             overflow: "hidden",
             flexShrink: 0,
             bgcolor: brand.logoSrc ? COLORS.frost : brand.color,
@@ -151,7 +151,7 @@ export function MobileBrandDetail({ brand }: { brand: Brand }) {
               component="button"
               type="button"
               onClick={() => setLimit((current) => current + PAGE)}
-              sx={{ width: "100%", minHeight: 44, borderRadius: 3, border: `1px solid ${COLORS.borderStrong}`, bgcolor: "transparent", color: COLORS.ink, fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
+              sx={{ width: "100%", minHeight: 44, borderRadius: `${RADIUS.md}px`, border: `1px solid ${COLORS.borderStrong}`, bgcolor: "transparent", color: COLORS.ink, fontSize: 13, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
             >
               Show {Math.min(PAGE, visible.length - rows.length)} more
             </Box>
@@ -167,7 +167,7 @@ export function MobileBrandDetail({ brand }: { brand: Brand }) {
 
 function Stat({ label, value, sub, color = COLORS.ink }: { label: string; value: string; sub: string; color?: string }) {
   return (
-    <Box sx={{ flex: 1, minWidth: 0, p: 1.3, bgcolor: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: 3.25 }}>
+    <Box sx={{ flex: 1, minWidth: 0, p: 1.3, bgcolor: COLORS.surface, border: `1px solid ${COLORS.border}`, borderRadius: `${RADIUS.md}px` }}>
       <Typography sx={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.inkMuted }}>
         {label}
       </Typography>

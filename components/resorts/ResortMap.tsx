@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Box } from "@mui/material";
 import "leaflet/dist/leaflet.css";
-import { COLORS } from "@/lib/design/tokens";
+import { COLORS, RADIUS } from "@/lib/design/tokens";
 import { useThemeMode } from "@/lib/design/useThemeMode";
 
 /** Close enough to see the valley, far enough to see where in the range it is. */
@@ -100,7 +100,7 @@ export function ResortMap({
       sx={{
         height,
         width: "100%",
-        borderRadius: 3,
+        borderRadius: `${RADIUS.md}px`,
         overflow: "hidden",
         bgcolor: COLORS.frost,
         border: `1px solid ${COLORS.border}`,

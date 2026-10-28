@@ -24,7 +24,13 @@ html,
 body {
   max-width: 100vw;
   min-height: 100%;
-  overflow-x: hidden;
+  /* `clip`, never `hidden`. Both stop a stray wide element from scrolling the
+     page sideways, but `hidden` turns this element into a scroll container,
+     and a `position: sticky` descendant then sticks to *it* rather than to
+     the viewport — which is exactly how the desktop header, and the theme
+     switch in it, scrolled away halfway down the page. `clip` creates no
+     scroll container, so sticky keeps working. */
+  overflow-x: clip;
   /* Painted before React mounts, so the page never flashes white on the way
      into dark mode. MUI's CssBaseline sets the same colours afterwards. */
   background: var(--ss-canvas);

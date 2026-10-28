@@ -11,7 +11,7 @@ import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
 import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
 import { APP_LOGO_ALT, APP_LOGO_SRC, APP_NAME } from "@/lib/branding";
-import { COLORS, FONT_DISPLAY } from "@/lib/design/tokens";
+import { COLORS, FONT_DISPLAY, RADIUS } from "@/lib/design/tokens";
 import { useThemeMode } from "@/lib/design/useThemeMode";
 
 /** Thumb-reachable minimum for anything tappable. */
@@ -136,7 +136,7 @@ function BottomNav({ pathname }: { pathname: string }) {
             sx={{
               flex: 1,
               minHeight: TAP + 2,
-              borderRadius: 3,
+              borderRadius: `${RADIUS.md}px`,
               textDecoration: "none",
               bgcolor: active ? COLORS.frost : "transparent",
               color: active ? COLORS.ink : COLORS.inkMuted,

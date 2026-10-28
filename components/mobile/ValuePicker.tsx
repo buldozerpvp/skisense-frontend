@@ -5,7 +5,7 @@ import { Box, Dialog, IconButton, InputBase, Stack, Typography } from "@mui/mate
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import { COLORS } from "@/lib/design/tokens";
+import { COLORS, RADIUS } from "@/lib/design/tokens";
 import { matchesQuery } from "@/lib/table/search";
 import type { PickerOption } from "@/lib/mobile/model";
 import { TAP } from "./MobileShell";
@@ -140,7 +140,7 @@ export function ValuePicker({
                   flexShrink: 0,
                   width: 21,
                   height: 21,
-                  borderRadius: 1.5,
+                  borderRadius: `${RADIUS.sm}px`,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -174,7 +174,7 @@ export function ValuePicker({
             sx={{
               width: "100%",
               minHeight: 48,
-              borderRadius: 3.5,
+              borderRadius: `${RADIUS.pill}px`,
               border: "none",
               bgcolor: COLORS.brand,
               color: COLORS.canvas,

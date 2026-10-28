@@ -5,7 +5,7 @@ import { Box, Dialog, IconButton, Stack, Typography } from "@mui/material";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import OpenInFullRoundedIcon from "@mui/icons-material/OpenInFullRounded";
 import CloseFullscreenRoundedIcon from "@mui/icons-material/CloseFullscreenRounded";
-import { COLORS, FONT_DISPLAY } from "@/lib/design/tokens";
+import { COLORS, FONT_DISPLAY, RADIUS } from "@/lib/design/tokens";
 import { countryBadge } from "@/lib/table/countries";
 import { buildPhotoUrl, photoSourceUrl, resortInfo } from "@/lib/resorts/resort-info";
 import { useResortCard } from "@/lib/resorts/useResortCard";
@@ -47,7 +47,7 @@ export function ResortCard() {
           sx: {
             bgcolor: COLORS.surface,
             backgroundImage: "none",
-            borderRadius: 5,
+            borderRadius: `${RADIUS.xl}px`,
             border: `1px solid ${COLORS.border}`,
             overflow: "hidden",
             m: { xs: 1.5, sm: 3 },
@@ -223,7 +223,7 @@ export function ResortCard() {
 /** One figure. A missing value renders a dash, never a zero. */
 function Stat({ label, value, unit }: { label: string; value?: number; unit: string }) {
   return (
-    <Box sx={{ flex: 1, minWidth: 0, p: 1.2, bgcolor: COLORS.canvas, border: `1px solid ${COLORS.border}`, borderRadius: 3 }}>
+    <Box sx={{ flex: 1, minWidth: 0, p: 1.2, bgcolor: COLORS.canvas, border: `1px solid ${COLORS.border}`, borderRadius: `${RADIUS.md}px` }}>
       <Typography sx={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: COLORS.inkMuted }}>
         {label}
       </Typography>

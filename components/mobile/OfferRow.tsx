@@ -1,7 +1,7 @@
 "use client";
 
 import { Box, Stack, Typography } from "@mui/material";
-import { COLORS, FONT_DISPLAY } from "@/lib/design/tokens";
+import { COLORS, FONT_DISPLAY, RADIUS } from "@/lib/design/tokens";
 import { PROPERTY_TYPE_ICON } from "@/lib/table/hotels";
 import { shortDeparture, type MobileOffer } from "@/lib/mobile/model";
 import { useResortCard } from "@/lib/resorts/useResortCard";
@@ -139,8 +139,8 @@ export function OfferRowSkeleton({ alt }: { alt: boolean }) {
       spacing={0.8}
       sx={{ px: 2, py: 1.5, borderBottom: `1px solid ${COLORS.border}`, bgcolor: alt ? COLORS.surface : "transparent" }}
     >
-      <Box sx={{ width: "55%", height: 13, borderRadius: 1, bgcolor: COLORS.border }} />
-      <Box sx={{ width: "75%", height: 11, borderRadius: 1, bgcolor: COLORS.border, opacity: 0.6 }} />
+      <Box sx={{ width: "55%", height: 13, borderRadius: `${RADIUS.sm}px`, bgcolor: COLORS.border }} />
+      <Box sx={{ width: "75%", height: 11, borderRadius: `${RADIUS.sm}px`, bgcolor: COLORS.border, opacity: 0.6 }} />
     </Stack>
   );
 }
