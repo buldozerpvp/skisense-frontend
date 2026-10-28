@@ -507,7 +507,9 @@ function DateField({ value, onChange, label }: { value: string | null; onChange:
         border: `1px solid ${COLORS.borderStrong}`,
         bgcolor: "transparent",
         color: value ? COLORS.ink : COLORS.inkMuted,
-        fontSize: 13,
+        // 16px because this is only ever focused with a thumb, and WebKit
+        // zooms the page in on a focused control under 16px.
+        fontSize: 16,
         fontFamily: "inherit",
       }}
     />

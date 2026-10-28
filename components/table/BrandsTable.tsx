@@ -465,8 +465,10 @@ export function BrandsTable() {
       {
         accessorKey: "date",
         header: "Dates",
-        // Wide enough for the two date inputs of the range filter.
-        size: 240,
+        // Wide enough for the two date inputs of the range filter at the
+        // app's 16px field minimum — at the old 13px they fitted in 240, and
+        // a narrower column clips the native control to "mm/dd/y".
+        size: 336,
         // A stay is a range, not a point: showing the return date saves the
         // reader doing date arithmetic against the nights column.
         Cell: ({ row }) => {

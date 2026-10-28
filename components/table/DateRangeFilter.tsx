@@ -31,7 +31,7 @@ export function DateRangeFilter<TData extends MRT_RowData>({
         value={from}
         onChange={(e) => update([e.target.value, to])}
         slotProps={{ inputLabel: { shrink: true } }}
-        sx={{ minWidth: 118 }}
+        sx={{ minWidth: 158 }}
       />
       <TextField
         type="date"
@@ -40,7 +40,7 @@ export function DateRangeFilter<TData extends MRT_RowData>({
         value={to}
         onChange={(e) => update([from, e.target.value])}
         slotProps={{ inputLabel: { shrink: true } }}
-        sx={{ minWidth: 118 }}
+        sx={{ minWidth: 158 }}
       />
     </Stack>
   );

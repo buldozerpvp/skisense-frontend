@@ -39,6 +39,39 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/*
+ * Every field, 16px minimum.
+ *
+ * WebKit — Safari, and every browser on iOS including Chrome — zooms the page
+ * in when a focused form control's text is under 16px, and then leaves the
+ * page scaled. The bar is cleared per field, so one input set smaller deep
+ * inside a sheet brings the lurch back on its own; this is the floor under
+ * all of them, including ones not written yet.
+ *
+ * Deliberately not scoped to touch. A rule that only holds on phones is a
+ * rule nobody can see breaking: a field written at 13px looks fine on the
+ * machine it was written on and zooms on the device it ships to. One size
+ * floor everywhere means the field you are looking at is the field a
+ * traveller gets.
+ *
+ * `max(16px, 1em)` raises only what is too small — a control already larger
+ * keeps its size, so nothing is flattened to 16px.
+ *
+ * The `[class]` in the selector is not decoration: MUI writes its sizes as a
+ * single emotion class, which outranks a bare `input` selector, so without
+ * that extra specificity this floor loses to every field in the app and
+ * quietly does nothing.
+ *
+ * The alternative fix — `maximum-scale=1` on the viewport — works by taking
+ * pinch-zoom away from everyone, which is a real loss for anyone who needs to
+ * magnify a price.
+ */
+input[class],
+select[class],
+textarea[class] {
+  font-size: max(16px, 1em);
+}
+
 a {
   color: inherit;
   text-decoration: none;
