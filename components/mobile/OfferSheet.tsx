@@ -9,7 +9,7 @@ import { COLORS, FONT_DISPLAY, RADIUS } from "@/lib/design/tokens";
 import { buildSeriesIndex, offerKey } from "@/lib/analytics/derive";
 import { useAllOffers } from "@/lib/query/usePrices";
 import { PROPERTY_TYPE_ICON, PROPERTY_TYPE_LABEL } from "@/lib/table/hotels";
-import { shortDeparture, type MobileOffer } from "@/lib/mobile/model";
+import { shortDeparture, stayRange, type MobileOffer } from "@/lib/mobile/model";
 import { useResortCard } from "@/lib/resorts/useResortCard";
 import { resortInfo } from "@/lib/resorts/resort-info";
 import { hotelPhotos } from "@/lib/resorts/hotel-photos";
@@ -187,8 +187,13 @@ export function OfferSheet({
             </Stack>
           </Box>
 
-          <Box sx={{ px: 2, mt: 1.6, display: "flex", flexWrap: "wrap", gap: 0.9 }}>
-            <Fact>{shortDeparture(offer.departure)}</Fact>
+          {/* The facts strip gets its own breathing room above the chart:
+              butted straight against the card, the chips read as its header
+              rather than as a separate line about the offer. */}
+          <Box sx={{ px: 2, mt: 1.6, mb: 1, display: "flex", flexWrap: "wrap", gap: 0.9 }}>
+            {/* Both ends of the stay, not just the departure — the day you
+                come home is half of what makes a week fit. */}
+            <Fact>{stayRange(offer.departure, offer.nights)}</Fact>
             {offer.nights && <Fact>{offer.nights} nights</Fact>}
             <Fact>👥 {offer.pax}</Fact>
             <Fact>{offer.countryName}</Fact>

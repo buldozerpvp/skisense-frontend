@@ -90,7 +90,9 @@ export function ValuePicker({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Type to narrow the list"
             inputProps={{ "aria-label": `Search ${title.toLowerCase()}` }}
-            sx={{ flex: 1, fontSize: 13.5, color: COLORS.ink }}
+            // 16px, for the same reason as the search bar: anything smaller
+            // and iOS zooms the page in when this field takes focus.
+            sx={{ flex: 1, fontSize: 16, color: COLORS.ink }}
           />
         </Stack>
 

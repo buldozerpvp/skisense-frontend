@@ -1,7 +1,6 @@
 "use client";
 
 import type { ReactNode } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Box, IconButton, Stack, Typography } from "@mui/material";
@@ -10,7 +9,8 @@ import TableRowsRoundedIcon from "@mui/icons-material/TableRowsRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
 import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
-import { APP_LOGO_ALT, APP_LOGO_SRC, APP_NAME } from "@/lib/branding";
+import { APP_LOGO_ALT, APP_NAME } from "@/lib/branding";
+import { SkiSenseMark } from "@/components/brand/SkiSenseMark";
 import { COLORS, FONT_DISPLAY, RADIUS } from "@/lib/design/tokens";
 import { useThemeMode } from "@/lib/design/useThemeMode";
 
@@ -52,7 +52,7 @@ export function MobileShell({ children }: { children: ReactNode }) {
         }}
       >
         <Stack component={Link} href="/" direction="row" spacing={1} alignItems="center" sx={{ textDecoration: "none" }}>
-          <Image src={APP_LOGO_SRC} alt={APP_LOGO_ALT} width={26} height={26} priority />
+          <SkiSenseMark size={26} title={APP_LOGO_ALT} />
           <Typography sx={{ fontFamily: FONT_DISPLAY, fontWeight: 800, fontSize: 16, color: COLORS.ink }}>
             {APP_NAME}
           </Typography>

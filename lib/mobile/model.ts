@@ -228,6 +228,27 @@ export function shortDeparture(iso: string): string {
 }
 
 /**
+ * The stay as a range — "27 Nov → 4 Dec" — the way the table writes it.
+ *
+ * A departure on its own answers half the question: someone checking whether
+ * a week fits around their own dates needs the day they come home, and
+ * working it out from "7 nights" in their head is exactly the arithmetic a
+ * comparison site should have done for them.
+ *
+ * Both ends are built in UTC rather than by adding days to a local date: a
+ * stay that crosses a daylight-saving change would otherwise come home an
+ * hour early and print the day before.
+ */
+export function stayRange(iso: string, nights: number | undefined): string {
+  const start = shortDeparture(iso);
+  if (!nights) return start;
+  const departure = Date.parse(`${iso}T00:00:00Z`);
+  if (Number.isNaN(departure)) return start;
+  const end = new Date(departure + nights * 86_400_000).toISOString().slice(0, 10);
+  return `${start} → ${shortDeparture(end)}`;
+}
+
+/**
  * Applies the whole filter set, then orders the result.
  *
  * Search runs last of the cheap checks and over the resolved display fields,

@@ -55,7 +55,11 @@ export function SearchBar({
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           inputProps={{ "aria-label": placeholder, enterKeyHint: "search" }}
-          sx={{ flex: 1, fontSize: 13.5, color: COLORS.ink }}
+          // 16px exactly, and not a tenth less: Safari on iOS zooms the page
+          // in whenever a focused input is under 16px, which is the lurch you
+          // get on tapping search. Nothing else here fixes it — a viewport
+          // `maximum-scale` would, by taking pinch-zoom away from everyone.
+          sx={{ flex: 1, fontSize: 16, color: COLORS.ink }}
         />
         {value && (
           <IconButton

@@ -59,6 +59,17 @@ export interface Palette {
   positiveSoft: string;
   negative: string;
   negativeSoft: string;
+  /**
+   * The brand mark's two inks.
+   *
+   * The logo is a snowflake with three bars standing inside it, and the two
+   * have to stay apart in both themes. On white the flake is the deep brand
+   * navy and the bars are ice blue; on the dark ground that reads as a navy
+   * smudge, so the flake takes alpine white and the bars take the navy —
+   * the same figure, with its two inks swapped round rather than dimmed.
+   */
+  markFlake: string;
+  markBars: string;
 }
 
 export const LIGHT_COLORS: Palette = {
@@ -86,6 +97,10 @@ export const LIGHT_COLORS: Palette = {
   positiveSoft: "#D9F2E8",
   negative: "#D03B3B",
   negativeSoft: "#FBE3E3",
+
+  // The logo as drawn: deep navy flake, ice-blue bars.
+  markFlake: "#0D3B66",
+  markBars: "#4FC3F7",
 };
 
 /**
@@ -123,6 +138,10 @@ export const DARK_COLORS: Palette = {
   positiveSoft: "#12352A",
   negative: "#FF6B6B",
   negativeSoft: "#3B1D1D",
+
+  // Swapped, not dimmed: alpine white flake, brand navy bars.
+  markFlake: "#F2F7FB",
+  markBars: "#13457A",
 };
 
 /** The CSS custom property that carries one token. */

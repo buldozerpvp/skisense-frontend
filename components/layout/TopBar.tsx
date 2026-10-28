@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -17,7 +16,8 @@ import {
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
 import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
-import { APP_LOGO_ALT, APP_LOGO_SRC, APP_NAME } from "@/lib/branding";
+import { APP_LOGO_ALT, APP_NAME } from "@/lib/branding";
+import { SkiSenseMark } from "@/components/brand/SkiSenseMark";
 import { COLORS, FONT_DISPLAY } from "@/lib/design/tokens";
 import { useThemeMode } from "@/lib/design/useThemeMode";
 
@@ -55,7 +55,7 @@ export function TopBar() {
       <Container maxWidth="xl" sx={{ px: { xs: 2, md: 3 } }}>
         <Toolbar disableGutters sx={{ gap: 2, flexWrap: "wrap", py: 1, minHeight: 64 }}>
           <Stack component={Link} href="/" direction="row" spacing={1.25} alignItems="center">
-            <Image src={APP_LOGO_SRC} alt={APP_LOGO_ALT} width={LOGO_SIZE} height={LOGO_SIZE} priority />
+            <SkiSenseMark size={LOGO_SIZE} title={APP_LOGO_ALT} />
             <Box>
               <Typography
                 sx={{ fontFamily: FONT_DISPLAY, fontWeight: 800, fontSize: 19, lineHeight: 1.1 }}
