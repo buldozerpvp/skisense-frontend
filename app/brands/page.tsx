@@ -1,15 +1,14 @@
 import { Box, Container } from "@mui/material";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
-import { SectionHeading } from "@/components/layout/SectionHeading";
-import { BrandWidgetGrid } from "@/components/brand-widget/BrandWidgetGrid";
-import { Responsive } from "@/components/mobile/Responsive";
-import { MobileBrands } from "@/components/mobile/MobileBrands";
+import { SectionHeading } from "@/features/app-shell/components/SectionHeading";
+import { BrandTileGrid } from "@/features/brands/components/BrandTileGrid";
+import { Responsive } from "@/features/app-shell/components/Responsive";
+import { BrandsScreen } from "@/features/brands/components/BrandsScreen";
 
-/** The Brands tab on a phone; on a laptop, the same grid the home page shows. */
-export default function BrandsPage() {
+const BrandsPage = () => {
   return (
     <Responsive
-      mobile={<MobileBrands />}
+      mobile={<BrandsScreen />}
       desktop={
         <Container maxWidth="xl" sx={{ py: { xs: 4, md: 6 }, px: { xs: 2, md: 3 } }}>
           <Box component="section">
@@ -18,10 +17,12 @@ export default function BrandsPage() {
               title="Brands"
               subtitle="Pick an operator to see its own prices."
             />
-            <BrandWidgetGrid />
+            <BrandTileGrid />
           </Box>
         </Container>
       }
     />
   );
-}
+};
+
+export default BrandsPage;

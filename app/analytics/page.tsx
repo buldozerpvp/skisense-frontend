@@ -1,15 +1,14 @@
 import { Box, Container } from "@mui/material";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
-import { SectionHeading } from "@/components/layout/SectionHeading";
-import { AnalyticsSection } from "@/components/charts/AnalyticsSection";
-import { Responsive } from "@/components/mobile/Responsive";
-import { MobileAnalytics } from "@/components/mobile/MobileAnalytics";
+import { SectionHeading } from "@/features/app-shell/components/SectionHeading";
+import { AnalyticsSection } from "@/features/analytics/components/AnalyticsSection";
+import { Responsive } from "@/features/app-shell/components/Responsive";
+import { AnalyticsScreen } from "@/features/analytics/components/AnalyticsScreen";
 
-/** Analytics, reached from the pill in the top bar on a phone. */
-export default function AnalyticsPage() {
+const AnalyticsPage = () => {
   return (
     <Responsive
-      mobile={<MobileAnalytics />}
+      mobile={<AnalyticsScreen />}
       desktop={
         <Container maxWidth="xl" sx={{ py: { xs: 4, md: 6 }, px: { xs: 2, md: 3 } }}>
           <Box component="section">
@@ -24,4 +23,6 @@ export default function AnalyticsPage() {
       }
     />
   );
-}
+};
+
+export default AnalyticsPage;

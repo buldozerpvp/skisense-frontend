@@ -1,12 +1,9 @@
-import { DesktopHome } from "@/components/layout/DesktopHome";
-import { Responsive } from "@/components/mobile/Responsive";
-import { MobileOffers } from "@/components/mobile/MobileOffers";
+import { DesktopHome } from "@/features/app-shell/components/DesktopHome";
+import { Responsive } from "@/features/app-shell/components/Responsive";
+import { OffersScreen } from "@/features/offers/components/OffersScreen";
 
-/**
- * Home. A laptop gets the hero, the brand tiles and the eleven-column table;
- * a phone gets the offers tab of the app, where the first price is above the
- * fold and nothing scrolls sideways.
- */
-export default function Home() {
-  return <Responsive mobile={<MobileOffers />} desktop={<DesktopHome />} />;
-}
+const Home = () => {
+  return <Responsive mobile={<OffersScreen />} desktop={<DesktopHome />} />;
+};
+
+export default Home;
