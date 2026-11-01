@@ -5,12 +5,11 @@ import { MenuItem, Stack, TextField, Typography } from "@mui/material";
 import { useAllOffers } from "@/features/prices/hooks/usePrices";
 import { useOffersBrowsing } from "@/features/offers/hooks/useOffersBrowsing";
 import { useSnapshotCursor } from "@/features/analytics/hooks/useSnapshotCursor";
-import { buildHomeModel, resortLevels, seasonWeeks, topMoves } from "@/features/analytics/lib/homeModel";
+import { buildHomeModel, operatorSeasons, resortLevels } from "@/features/analytics/lib/homeModel";
 import { CheapestResorts } from "@/features/analytics/charts/components/CheapestResorts";
-import { ChangeBoard } from "@/features/analytics/charts/components/ChangeBoard";
-import { SeasonBand } from "@/features/analytics/charts/components/SeasonBand";
+import { OperatorSeasonLines } from "@/features/analytics/charts/components/OperatorSeasonLines";
 import { SnapshotScrubber } from "@/features/analytics/components/SnapshotScrubber";
-import { ALL_RESORTS, CHEAPEST_RESORT_ROWS, MOVERS_PER_SIDE } from "@/features/analytics/constants";
+import { ALL_RESORTS, CHEAPEST_RESORT_ROWS } from "@/features/analytics/constants";
 
 export const AnalyticsSection = () => {
   const { data: history, isFetching } = useAllOffers();
@@ -43,26 +42,7 @@ export const AnalyticsSection = () => {
   );
 
   const levels = useMemo(() => resortLevels(offers, CHEAPEST_RESORT_ROWS), [offers]);
-  const weeks = useMemo(() => seasonWeeks(offers), [offers]);
-
-  const moves = useMemo(() => {
-    const scoped =
-      resort === ALL_RESORTS ? model.movers : model.movers.filter((m) => m.resort === resort);
-    return topMoves(scoped, MOVERS_PER_SIDE);
-  }, [model, resort]);
-
-  const summary = useMemo(() => {
-    if (resort === ALL_RESORTS) return model.summary;
-    const scoped = model.offers.filter((o) => o.resort === resort);
-    const moved = model.movers.filter((m) => m.resort === resort);
-    return {
-      cheaper: moved.filter((m) => (m.delta as number) < 0).length,
-      dearer: moved.filter((m) => (m.delta as number) > 0).length,
-      rechecked: scoped.filter((o) => o.prevTotal !== null).length,
-      lastCheck: model.summary.lastCheck,
-    };
-  }, [model, resort]);
-
+  const seasons = useMemo(() => operatorSeasons(offers), [offers]);
   return (
     <Stack spacing={2.5}>
       <Stack
@@ -101,9 +81,7 @@ export const AnalyticsSection = () => {
 
       <CheapestResorts levels={levels} isFetching={isFetching} />
 
-      <ChangeBoard moves={moves} summary={summary} isFetching={isFetching} />
-
-      <SeasonBand weeks={weeks} isFetching={isFetching} />
+      <OperatorSeasonLines seasons={seasons} isFetching={isFetching} />
     </Stack>
   );
 };

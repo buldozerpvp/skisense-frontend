@@ -1,16 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
+  MRT_ShowHideColumnsButton,
+  MRT_ToggleFullScreenButton,
   type MRT_ColumnDef,
   type MRT_ColumnFiltersState,
+  type MRT_PaginationState,
   type MRT_SortingState,
   type MRT_VisibilityState,
 } from "material-react-table";
 import {
+  Badge,
   Box,
+  Button,
   Chip,
   Typography,
   Avatar,
@@ -21,9 +26,12 @@ import {
   TextField,
   InputAdornment,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import { COLORS } from "@/shared/design/tokens";
 import {
   fitsParty,
@@ -45,7 +53,26 @@ import {
   propertyTypeOf,
 } from "@/features/offers/lib/hotelLabels";
 import { MultiSelectFilter, isOneOf } from "@/features/offers/filtering/components/MultiSelectFilter";
-import { shortDate } from "@/shared/format/formatters";
+import { pct as formatPct, shortDate } from "@/shared/format/formatters";
+import { buildSeriesIndex, offerKey } from "@/features/analytics/lib/deriveSeries";
+import { useChartColors, changeColor } from "@/shared/charts/lib/palette";
+import { PriceSparkline, type SparklinePoint } from "@/features/offers/components/PriceSparkline";
+import {
+  COLUMN_ORDER,
+  COLUMN_WIDTH,
+  BOTTOM_BAR_MIN_PX,
+  FILTER_ROW_WIDTH,
+  HEADER_CONTENT_MIN_PX,
+  HEADER_HEIGHT_PX,
+  PAGE_SIZE,
+  PINNED_COLUMNS,
+  WIDTH_KEY_BY_COLUMN_ID,
+  SCROLL_CHUNK,
+  SCROLL_REACH_PX,
+  PRICE_COLUMNS,
+  PRICE_TINT_PCT,
+  UNCHANGED_PCT,
+} from "@/features/offers/constants";
 import { matchesQuery } from "@/features/offers/lib/offerSearch";
 import { useAllOffers, useLatestOffers } from "@/features/prices/hooks/usePrices";
 import { buildOffers, type Offer } from "@/features/offers/lib/offerModel";
@@ -95,6 +122,38 @@ const resolveNights = (row: BrandedPriceRow): number | undefined => {
   return row.nights ?? getBrand(row.brandSlug)?.defaultNights;
 };
 
+const priceBlockSx = (columnId: string, surface: "head" | "body") => {
+  if (!PRICE_COLUMNS.includes(columnId)) return {};
+  const tint = PRICE_TINT_PCT[surface];
+  return {
+    textAlign: "center" as const,
+    justifyContent: "center",
+    ...(surface === "head"
+      ? {
+          "& .Mui-TableHeadCell-Content": { width: "100%", justifyContent: "center", alignItems: "center" },
+          "& .Mui-TableHeadCell-Content-Labels": { width: "auto", justifyContent: "center" },
+          "& .Mui-TableHeadCell-Content-Wrapper": { textAlign: "center" as const },
+        }
+      : {}),
+    bgcolor:
+      surface === "head"
+        ? `color-mix(in srgb, ${COLORS.brand} ${tint}%, ${COLORS.frost})`
+        : `color-mix(in srgb, ${COLORS.brand} ${tint}%, transparent)`,
+    boxShadow:
+      columnId === "total"
+        ? `inset 1px 0 0 ${COLORS.borderStrong}, inset -1px 0 0 ${COLORS.inkFaint}`
+        : `inset -1px 0 0 ${COLORS.borderStrong}`,
+  };
+};
+
+const pinnedSx = (columnId: string, surface: "head" | "body") => {
+  if (!PINNED_COLUMNS.includes(columnId)) return {};
+  return {
+    bgcolor: surface === "head" ? COLORS.frost : "inherit",
+    zIndex: surface === "head" ? 4 : 3,
+  };
+};
+
 const toOptions = (values: (string | undefined)[]): { label: string; value: string }[] => {
   return [...new Set(values.filter((v): v is string => Boolean(v)))]
     .sort((a, b) => a.localeCompare(b))
@@ -106,6 +165,7 @@ export const OffersTable = () => {
 
   const { data, isLoading } = useLatestOffers();
   const history = useAllOffers();
+  const chartColors = useChartColors();
   const [openOfferKey, setOpenOfferKey] = useState<string | null>(null);
   const selectedBrands = useOffersBrowsing((s) => s.selectedBrands);
   const searchText = useOffersBrowsing((s) => s.searchText);
@@ -114,6 +174,21 @@ export const OffersTable = () => {
   const [columnFilters, setColumnFilters] = useState<MRT_ColumnFiltersState>(DEFAULT_FILTERS);
   const [sorting, setSorting] = useState<MRT_SortingState>(DEFAULT_SORTING);
   const [party, setParty] = useState<PartyChoice>(2);
+  // The button answers at once and the table catches up. Toggling the filter
+  // row rebuilds every column definition, because the widths change, and that
+  // re-renders every visible cell — around 150 rows by 15 columns — so the
+  // click used to sit there for half a second before the button even looked
+  // pressed. `filtersWanted` is what the button draws itself from, so it flips
+  // immediately; `showColumnFilters` is what the table reads, and it moves
+  // inside a transition React is free to interrupt.
+  const [filtersWanted, setFiltersWanted] = useState(false);
+  const [showColumnFilters, setShowColumnFilters] = useState(false);
+  const [, startFilterTransition] = useTransition();
+
+  const applyShowFilters = useCallback((next: boolean) => {
+    setFiltersWanted(next);
+    startFilterTransition(() => setShowColumnFilters(next));
+  }, []);
   const [templates, setTemplates] = useState<FilterTemplate[]>([]);
   const [activeTemplateId, setActiveTemplateId] = useState("");
 
@@ -157,6 +232,28 @@ export const OffersTable = () => {
   );
 
   const detailOffers = useMemo(() => buildOffers(data, history.data), [data, history.data]);
+
+  const watchedByKey = useMemo(() => {
+    if (!history.data) return new Map<string, { points: SparklinePoint[]; movePct: number | null }>();
+    const index = buildSeriesIndex(history.data);
+    const watched = new Map<string, { points: SparklinePoint[]; movePct: number | null }>();
+    for (const [key, series] of index.byKey) {
+      const points = series.points.map((point) => ({ day: point.day, total: point.priceEur }));
+      const first = points[0]?.total ?? 0;
+      const last = points[points.length - 1]?.total ?? 0;
+      watched.set(key, {
+        points,
+        movePct: points.length > 1 && first > 0 ? ((last - first) / first) * 100 : null,
+      });
+    }
+    return watched;
+  }, [history.data]);
+
+  const watchedFor = useCallback(
+    (row: BrandedPriceRow) =>
+      watchedByKey.get(offerKey(row.brandSlug, row.resortId, row.date, row.nights)) ?? null,
+    [watchedByKey]
+  );
   const openOffer = useMemo(
     () => detailOffers.find((offer) => offer.key === openOfferKey) ?? null,
     [detailOffers, openOfferKey]
@@ -246,12 +343,27 @@ export const OffersTable = () => {
     storeActiveTemplateId("");
   }, []);
 
+  // The filter row needs wider columns, but a width that lives in the column
+  // definitions makes every toggle rebuild all fifteen of them and re-render
+  // every visible cell. MRT reads widths from `columnSizing` instead, which
+  // only rewrites CSS variables on the table element — no definition is
+  // touched, no cell re-renders, and opening the filters is immediate.
+  const columnSizing = useMemo(() => {
+    const sizing: Record<string, number> = {};
+    for (const [columnId, key] of Object.entries(WIDTH_KEY_BY_COLUMN_ID)) {
+      sizing[columnId] = showColumnFilters
+        ? FILTER_ROW_WIDTH[key] ?? COLUMN_WIDTH[key]
+        : COLUMN_WIDTH[key];
+    }
+    return sizing;
+  }, [showColumnFilters]);
+
   const columns = useMemo<MRT_ColumnDef<BrandedPriceRow>[]>(
     () => [
       {
         accessorKey: "brandSlug",
         header: "Brand",
-        size: 150,
+        size: COLUMN_WIDTH["brand"],
         Cell: ({ cell }) => {
           const brand = getBrand(cell.getValue<string>());
           return (
@@ -277,7 +389,7 @@ export const OffersTable = () => {
       {
         accessorKey: "resort",
         header: "Resort",
-        size: 190,
+        size: COLUMN_WIDTH["resort"],
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
         Filter: ({ column }) => <MultiSelectFilter column={column} options={resortOptions} />,
         Cell: ({ row }) => {
@@ -339,7 +451,7 @@ export const OffersTable = () => {
       {
         id: "hotel",
         header: "Hotel",
-        size: 240,
+        size: COLUMN_WIDTH["hotel"],
         accessorFn: (row) => hotelLabelOf(row, labels) ?? "",
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
         Filter: ({ column }) => <MultiSelectFilter column={column} options={hotelOptions} />,
@@ -373,7 +485,7 @@ export const OffersTable = () => {
       {
         accessorKey: "country",
         header: "Country",
-        size: 150,
+        size: COLUMN_WIDTH["country"],
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
         Filter: ({ column }) => (
           <MultiSelectFilter
@@ -392,7 +504,7 @@ export const OffersTable = () => {
       {
         accessorKey: "date",
         header: "Dates",
-        size: 336,
+        size: COLUMN_WIDTH["dates"],
         Cell: ({ row }) => {
           const { date } = row.original;
           const nights = resolveNights(row.original);
@@ -402,8 +514,8 @@ export const OffersTable = () => {
                 {shortDate(date)}
                 {nights ? ` → ${shortDate(addDays(date, nights))}` : ""}
               </Box>
-              <Typography variant="caption" color="text.secondary" className="tabular">
-                {date}
+              <Typography variant="caption" color="text.secondary">
+                {new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" })}
               </Typography>
             </Box>
           );
@@ -415,7 +527,7 @@ export const OffersTable = () => {
       {
         id: "nights",
         header: "Nights",
-        size: 150,
+        size: COLUMN_WIDTH["nights"],
         accessorFn: (row) => resolveNights(row) ?? 0,
         Cell: ({ row }) => {
           const nights = resolveNights(row.original);
@@ -428,7 +540,7 @@ export const OffersTable = () => {
       {
         id: "propertyType",
         header: "Type",
-        size: 150,
+        size: COLUMN_WIDTH["type"],
         accessorFn: (row) => propertyTypeOf(row),
         Cell: ({ row }) => {
           const type = propertyTypeOf(row.original);
@@ -445,7 +557,7 @@ export const OffersTable = () => {
       {
         id: "pax",
         header: "People",
-        size: 120,
+        size: COLUMN_WIDTH["pax"],
         accessorFn: (row) => paxOf(row),
         sortingFn: "basic",
         Cell: ({ row }) => {
@@ -465,7 +577,7 @@ export const OffersTable = () => {
       {
         id: "total",
         header: "Total",
-        size: 158,
+        size: COLUMN_WIDTH["total"],
         accessorFn: (row) => totalPrice(row),
         sortingFn: "basic",
         Cell: ({ row }) => (
@@ -485,24 +597,77 @@ export const OffersTable = () => {
       {
         id: "perPerson",
         header: party === "any" ? "Each" : `Each (÷${party})`,
-        size: 128,
+        size: COLUMN_WIDTH["perPerson"],
         accessorFn: (row) => pricePerPerson(row, party === "any" ? paxOf(row) : party),
         sortingFn: "basic",
         enableColumnFilter: false,
         Cell: ({ row }) => (
-          <Box className="tabular">
+          <Box className="tabular" sx={{ fontWeight: 600 }}>
             €
             {pricePerPerson(
               row.original,
               party === "any" ? paxOf(row.original) : party
             ).toLocaleString()}
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
+              each
+            </Typography>
           </Box>
         ),
       },
       {
+        id: "change",
+        header: "Since first seen",
+        size: COLUMN_WIDTH["change"],
+        enableColumnFilter: false,
+        accessorFn: (row) => watchedFor(row)?.movePct ?? null,
+        sortingFn: (a, b, id) => {
+          const left = a.getValue<number | null>(id);
+          const right = b.getValue<number | null>(id);
+          if (left === null) return right === null ? 0 : 1;
+          if (right === null) return -1;
+          return left - right;
+        },
+        Cell: ({ row }) => {
+          if (history.isLoading) {
+            return (
+              <Typography variant="caption" color="text.disabled">
+                …
+              </Typography>
+            );
+          }
+          const watched = watchedFor(row.original);
+          const move = watched?.movePct ?? null;
+          const settled = move !== null && Math.abs(move) < UNCHANGED_PCT;
+          return (
+            <Tooltip
+              title={
+                watched
+                  ? `${watched.points.length} ${watched.points.length === 1 ? "night" : "nights"} watched`
+                  : "Not seen on an earlier night yet."
+              }
+            >
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                <PriceSparkline points={watched?.points ?? []} movePct={move} />
+                <Box
+                  className="tabular"
+                  sx={{
+                    fontSize: 12.5,
+                    fontWeight: settled ? 400 : 600,
+                    color:
+                      move === null || settled ? COLORS.inkFaint : changeColor(move, chartColors),
+                  }}
+                >
+                  {move === null ? "—" : settled ? "0%" : formatPct(move)}
+                </Box>
+              </Box>
+            </Tooltip>
+          );
+        },
+      },
+      {
         id: "open",
-        header: "Open",
-        size: 72,
+        header: "",
+        size: COLUMN_WIDTH["open"],
         enableSorting: false,
         enableColumnFilter: false,
         Cell: ({ row }) => {
@@ -532,7 +697,7 @@ export const OffersTable = () => {
       {
         id: "board",
         header: "Meals",
-        size: 140,
+        size: COLUMN_WIDTH["board"],
         accessorFn: (row) => boardFor(row.brandSlug, row.board),
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
         Filter: ({ column }) => (
@@ -555,7 +720,7 @@ export const OffersTable = () => {
       {
         id: "flights",
         header: "Package",
-        size: 150,
+        size: COLUMN_WIDTH["flights"],
         accessorFn: (row) => flightStatus(row.brandSlug, row.flights),
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
         Filter: ({ column }) => (
@@ -584,7 +749,7 @@ export const OffersTable = () => {
       {
         accessorKey: "status",
         header: "Status",
-        size: 126,
+        size: COLUMN_WIDTH["status"],
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
         Filter: ({ column }) => (
           <MultiSelectFilter
@@ -598,12 +763,25 @@ export const OffersTable = () => {
         },
       },
     ],
-    [resortOptions, countryOptions, nightsOptions, hotelOptions, paxOptions, typeOptions, labels, party]
+    [
+      resortOptions,
+      countryOptions,
+      nightsOptions,
+      hotelOptions,
+      paxOptions,
+      typeOptions,
+      labels,
+      party,
+      watchedFor,
+      history.isLoading,
+      chartColors,
+    ]
   );
 
   const [columnVisibility, setColumnVisibility] = useState<MRT_VisibilityState>({
     brandSlug: true,
     country: true,
+    pax: false,
     status: false,
   });
 
@@ -616,73 +794,187 @@ export const OffersTable = () => {
   }, [onBrandPage]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  // Two ways through a long result set. Scrolling is the default because the
+  // question is almost always "what else is there" rather than "what is on
+  // page four"; paging stays because a fixed page is the only way to hold a
+  // place while comparing. Both run off the same client-side row model — the
+  // scroll mode simply grows the page until the rows run out.
+  const [rowMode, setRowMode] = useState<"scroll" | "pages">("scroll");
+  const [pagination, setPagination] = useState<MRT_PaginationState>({
+    pageIndex: 0,
+    pageSize: SCROLL_CHUNK,
+  });
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    setPagination({ pageIndex: 0, pageSize: rowMode === "scroll" ? SCROLL_CHUNK : PAGE_SIZE });
+    scrollRef.current?.scrollTo({ top: 0 });
+  }, [rowMode, columnFilters, sorting, searchText, party]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // rows.length is the unfiltered total, so it only ever over-estimates what
+  // is left: the guard stops the page growing forever, and the row model
+  // still decides how many of those rows a filter lets through.
+  const handleScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      if (rowMode !== "scroll") return;
+      const el = event.currentTarget;
+      if (el.scrollHeight - el.scrollTop - el.clientHeight > SCROLL_REACH_PX) return;
+      setPagination((prev) =>
+        prev.pageSize >= rows.length
+          ? prev
+          : { pageIndex: prev.pageIndex, pageSize: prev.pageSize + SCROLL_CHUNK }
+      );
+    },
+    [rowMode, rows.length]
+  );
+
   const table = useMaterialReactTable({
     columns,
     data: rows,
-    state: { isLoading, columnFilters, sorting, columnVisibility },
+    state: { isLoading, columnFilters, sorting, columnVisibility, showColumnFilters, pagination, columnSizing },
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
+    onShowColumnFiltersChange: (updater: boolean | ((prev: boolean) => boolean)) =>
+      applyShowFilters(typeof updater === "function" ? updater(filtersWanted) : updater),
     onSortingChange: setSorting,
+    onPaginationChange: setPagination,
+    enableBottomToolbar: true,
     enableGrouping: true,
     enableColumnActions: false,
     enableGlobalFilter: false, 
     enableColumnFilters: true,
     enableStickyHeader: true,
-    enableDensityToggle: true,
+    enableDensityToggle: false,
+    enableColumnPinning: true,
+    renderToolbarInternalActions: ({ table: instance }) => (
+      <>
+        <MRT_ShowHideColumnsButton table={instance} />
+        <MRT_ToggleFullScreenButton table={instance} />
+      </>
+    ),
     enableColumnResizing: false,
     enableColumnDragging: false,
     enableColumnOrdering: false,
     layoutMode: "grid",
     initialState: {
       density: "compact",
-      showColumnFilters: true,
-      pagination: { pageSize: 10, pageIndex: 0 },
+      columnOrder: COLUMN_ORDER,
+      columnPinning: { left: PINNED_COLUMNS },
     },
-    muiTableContainerProps: { sx: { maxHeight: 560 } },
+    muiTableContainerProps: { ref: scrollRef, onScroll: handleScroll, sx: { maxHeight: 560 } },
     muiTableHeadProps: { sx: { bgcolor: COLORS.frost } },
     muiTableHeadRowProps: { sx: { bgcolor: COLORS.frost } },
-    muiTableHeadCellProps: {
+    muiTableHeadCellProps: ({ column }) => ({
       sx: {
         bgcolor: COLORS.frost,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        minHeight: 104,
-        pt: 1.5,
-        pb: 1,
+        minHeight: showColumnFilters ? HEADER_HEIGHT_PX.withFilters : HEADER_HEIGHT_PX.bare,
+        pt: showColumnFilters ? 1.5 : 0.5,
+        pb: showColumnFilters ? 1 : 0.5,
         px: 1.25,
-        "& .Mui-TableHeadCell-Content": { width: "100%", alignItems: "flex-start", minHeight: 30 },
+        "& .Mui-TableHeadCell-Content": {
+          width: "100%",
+          alignItems: "flex-start",
+          minHeight: showColumnFilters ? HEADER_CONTENT_MIN_PX.withFilters : HEADER_CONTENT_MIN_PX.bare,
+        },
         "& .Mui-TableHeadCell-Content-Labels": { width: "100%", gap: 0.25 },
         "& .Mui-TableHeadCell-Content-Wrapper": {
           fontSize: 13.5,
           fontWeight: 700,
           letterSpacing: "0.01em",
-          whiteSpace: "normal",
+          lineHeight: 1.25,
+          whiteSpace: showColumnFilters ? "normal" : "nowrap",
           overflow: "visible",
           textOverflow: "clip",
         },
         "& .MuiCollapse-root": { width: "100%", marginTop: "auto" },
         "& .MuiInputBase-root": { fontSize: 13 },
         "& .MuiFormLabel-root": { fontSize: 12 },
+        ...priceBlockSx(column.id, "head"),
+        ...pinnedSx(column.id, "head"),
       },
-    },
-    muiTableBodyCellProps: { sx: { fontSize: 13.5, px: 1.25 } },
+    }),
+    muiTableBodyCellProps: ({ column }) => ({
+      sx: {
+        fontSize: 13.5,
+        px: 1.25,
+        ...priceBlockSx(column.id, "body"),
+        ...pinnedSx(column.id, "body"),
+      },
+    }),
     muiTableBodyRowProps: ({ row }) => {
       const offer = row.original as BrandedPriceRow | undefined;
       if (!offer?.resortId) return {};
+      const open = () => setOpenOfferKey(offerDetailKey(offer));
       return {
-        onClick: () => setOpenOfferKey(offerDetailKey(offer)),
+        onClick: open,
+        onKeyDown: (event: React.KeyboardEvent) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          if ((event.target as HTMLElement).closest("a, button")) return;
+          event.preventDefault();
+          open();
+        },
+        tabIndex: 0,
+        role: "button",
+        "aria-label": `Open ${offer.hotel ?? offer.resort}, departing ${offer.date}`,
         sx: {
           cursor: "pointer",
-          "&:hover td": { bgcolor: COLORS.frost },
+          bgcolor: COLORS.surface,
+          "&:hover": { bgcolor: COLORS.frost },
+          "&:focus-visible": { outline: `2px solid ${COLORS.brand}`, outlineOffset: "-2px" },
         },
       };
     },
     muiFilterTextFieldProps: { placeholder: "Filter" },
     muiTopToolbarProps: { sx: { bgcolor: COLORS.frost, borderBottom: `1px solid ${COLORS.border}` } },
-    muiBottomToolbarProps: { sx: { bgcolor: COLORS.frost, borderTop: `1px solid ${COLORS.border}` } },
+    muiBottomToolbarProps: {
+      sx: {
+        bgcolor: COLORS.frost,
+        borderTop: `1px solid ${COLORS.border}`,
+        minHeight: `${BOTTOM_BAR_MIN_PX}px`,
+        "& > .MuiBox-root": { py: 0.25 },
+        "& .MuiTablePagination-root": { minHeight: 0, px: 1, py: 0 },
+      },
+    },
+    muiPaginationProps: { showFirstButton: true, showLastButton: true },
+    renderBottomToolbarCustomActions: () => (
+      <ToggleButtonGroup
+        exclusive
+        size="small"
+        value={rowMode}
+        onChange={(_, next: "scroll" | "pages" | null) => next && setRowMode(next)}
+        sx={{
+          ml: 1,
+          "& .MuiToggleButton-root": {
+            borderRadius: 999,
+            px: 1.5,
+            py: 0.25,
+            fontSize: 12.5,
+            textTransform: "none",
+          },
+        }}
+      >
+        <ToggleButton value="scroll">Endless scroll</ToggleButton>
+        <ToggleButton value="pages">Pages</ToggleButton>
+      </ToggleButtonGroup>
+    ),
     renderTopToolbarCustomActions: () => (
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexWrap: "wrap", gap: 1 }}>
+        <Badge badgeContent={columnFilters.length} color="primary" overlap="rectangular">
+          <Button
+            size="small"
+            variant={filtersWanted ? "contained" : "outlined"}
+            startIcon={<FilterListRoundedIcon fontSize="small" />}
+            onClick={() => applyShowFilters(!filtersWanted)}
+            sx={{ borderRadius: 999 }}
+          >
+            Filters
+          </Button>
+        </Badge>
         <FilterTemplateBar
           templates={templates}
           activeId={activeTemplateId}
@@ -709,23 +1001,21 @@ export const OffersTable = () => {
             },
           }}
         />
-        <Tooltip title="Operators sell a room, not a seat. This shows only the offers priced for a party of this size.">
-          <TextField
-            select
-            size="small"
-            label="Travelling"
-            value={String(party)}
-            onChange={(e) => setParty(e.target.value === "any" ? "any" : Number(e.target.value))}
-            sx={{ width: 170 }}
-          >
-            <MenuItem value="any">Any size ({matchingRows.length})</MenuItem>
-            {[...partyCounts.keys()].sort((a, b) => a - b).map((n) => (
-              <MenuItem key={n} value={String(n)}>
-                {n} {n === 1 ? "person" : "people"} ({partyCounts.get(n)})
-              </MenuItem>
-            ))}
-          </TextField>
-        </Tooltip>
+        <TextField
+          select
+          size="small"
+          label="Travelling"
+          value={String(party)}
+          onChange={(e) => setParty(e.target.value === "any" ? "any" : Number(e.target.value))}
+          sx={{ width: 170 }}
+        >
+          <MenuItem value="any">Any size ({matchingRows.length})</MenuItem>
+          {[...partyCounts.keys()].sort((a, b) => a - b).map((n) => (
+            <MenuItem key={n} value={String(n)}>
+              {n} {n === 1 ? "person" : "people"} ({partyCounts.get(n)})
+            </MenuItem>
+          ))}
+        </TextField>
       </Stack>
     ),
     renderEmptyRowsFallback: () => (

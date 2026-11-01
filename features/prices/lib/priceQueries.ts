@@ -1,4 +1,5 @@
 import { query } from "@/features/prices/lib/databaseClient";
+import { decodeEntities } from "@/shared/format/entities";
 import type { PriceRow, SourceOffers, SourceOfferHistory } from "@/features/prices/lib/priceTypes";
 
 interface OfferRecord {
@@ -59,7 +60,7 @@ const toPriceRow = (r: OfferRecord): PriceRow => {
     resortId: r.resortId,
     resort: r.resort,
     resortKey: r.resortKey ?? undefined,
-    hotel: r.hotel ?? undefined,
+    hotel: r.hotel ? decodeEntities(r.hotel) : undefined,
     hotelKey: r.hotelKey ?? undefined,
     propertyType: (r.propertyType as PriceRow["propertyType"]) ?? undefined,
     board: r.board ?? undefined,

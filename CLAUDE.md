@@ -30,6 +30,7 @@ features/
     clubmed/             the one operator with page content of its own
   analytics/             the fold, the scrubber, the cards
     charts/              the hand-rolled SVG charts themselves
+    swarm/               the home page's self-playing band of every offer
   prices/                the API, the database and the query hooks everything reads
   app-shell/             header, phone shell, theme, viewport
 shared/
@@ -63,6 +64,13 @@ collector machine being reachable from the internet.
 - `features/prices/lib/databaseClient.ts` caches the pg Pool on `globalThis`: a new pool per request
   would exhaust the connection limit on serverless. Use Neon's **pooled**
   string, the host with `-pooler` in it.
+- **`toPriceRow` decodes HTML entities in the hotel name** (`shared/format/entities.ts`,
+  decoding until the string stops changing — Skideal double-encodes). The
+  backend decodes too, but rows already in Postgres carry whatever the build
+  that stored them produced, so the boundary here is what makes the table
+  right today rather than after the next `backfill:hotels`. Decode at the
+  boundary, not at each render site: the name is read by the table, the
+  panel, the filter sheet, the map and the resort card.
 - Responses carry `s-maxage=300, stale-while-revalidate=86400`. Prices change
   once a night, so the CDN answers repeat visits and the database is left
   alone — which is what keeps Neon's free egress allowance comfortable.
@@ -85,7 +93,19 @@ collector machine being reachable from the internet.
 
 ## Layout
 
-- `app/page.tsx` — hero, brand tiles, the combined offers table, then analytics.
+- `app/page.tsx` — hero, brand tiles, the combined offers table. **Analytics is
+  not on the home page**; it is its own route.
+- `app/analytics` — the swarm and every price chart, one `AnalyticsPane` shared
+  by both surfaces. It used to be split: the band lived on the home page and
+  the phone got `AnalyticsScreen`, a separate three-tab screen of bars that
+  reimplemented cheapest-resorts, movers and a month band in miniature. Two
+  implementations of the same question drift, so the phone now gets the real
+  charts — they are all measured from their container and fit a 390px screen.
+  One thing was lost in the merge and is worth knowing: `AnalyticsScreen` read
+  the phone's `useOfferFilters`, so the charts followed the list's filters.
+  `AnalyticsSection` scopes by `selectedBrands` only, so on a phone the charts
+  now show everything. Wiring the phone filter store into `AnalyticsSection`
+  is the fix, not bringing the second screen back.
 - `app/brands/[slug]` — brand hero, **the offers table first**, then that
   brand's own analytics. A brand with no stored snapshot shows a plain
   "no prices collected yet" note instead of a page of zeroes.
@@ -206,7 +226,12 @@ brings its own header and bottom bar.
 
 - **Two destinations** in the bottom bar, Offers and Brands. Analytics is a
   pill in the top bar on every screen — a place you visit, not a place you
-  browse from, and two tabs keep both targets wide.
+  browse from, and two tabs keep both targets wide. On the desktop that pill
+  (`AnalyticsPill`) is an icon until you point at it, then the label slides
+  out of it; on the current route it stays open and brand-filled. The width
+  is animated through `max-width` rather than `width`, because `width: auto`
+  is not an animatable value, and the whole thing goes still under
+  `prefers-reduced-motion`.
 - **`features/offers/lib/offerModel.ts`** flattens a snapshot row into everything a phone
   row shows (label, badge, total, per person, overnight move) once, because a
   phone row has no columns to resolve cells from. The move comes from
@@ -344,6 +369,92 @@ whatever that map holds, so adding a source later is a data job, not a UI one.
 
 ## The offers table
 
+- **The order of the columns is the product.** `COLUMN_ORDER` puts resort,
+  hotel, total and each first, so the price is on screen the moment the page
+  loads. **Total and Each are one block**: both carry a `color-mix` tint over
+  whatever is behind them, a hairline on the block's two outer edges and a
+  darker `inkFaint` rule between them, so the pair reads as one answer with
+  two halves. All three edges are `inset` box-shadows on the cells rather than
+  borders, which is why the row hover still shows through and why it holds up
+  in dark mode, where a drop shadow would be invisible. Both are centred, and
+  centring needs `justifyContent` as well as `text-align` because
+  `layoutMode: "grid"` makes every cell a flex container — and the price
+  overrides have to come last in the `sx` or the base header rules win. The columns declare about 2,000px against a frame of roughly
+  1,330px, so anything after those four needs a sideways scroll — which is
+  fine for Meals and Package and fatal for the price. Column pinning was tried
+  first and abandoned: with `layoutMode: "grid"` the sticky right-hand group
+  left the unpinned headers bleeding through it.
+- **Two ways through a long list, and scrolling is the default.** The bottom
+  bar carries the whole apparatus on one 32px row: the Endless scroll / Pages
+  switch on the left, MRT's own paginator on the right. The two modes are not
+  separate machinery — **scrolling is a page that grows**. Reaching within
+  `SCROLL_REACH_PX` of the container's bottom adds `SCROLL_CHUNK` to
+  `pageSize` and leaves `pageIndex` where it is, so the page arrows keep
+  working in either mode and page three can grow exactly like page one.
+  Growth is capped at the unfiltered `rows.length`, which only over-estimates
+  what is left, so the page cannot grow forever. The count is MRT's own
+  "1-150 of 2,742". A hand-rolled count in `renderBottomToolbarCustomActions`
+  was tried and removed: it said the same thing the paginator already said.
+  Note that the renderer itself is not free — its mere presence flips MRT's
+  pagination from `position: absolute` to `relative`, so anything rendered
+  there must not be `width: 100%` or the paginator is pushed onto a second
+  line and the bar doubles in height. Any change of filter, sort, search or
+  party size resets the page and scrolls back to the top — a grown page held
+  across a filter change would show a jarringly long list of a suddenly small
+  result.
+- **The table sorts by departure date.** A € a night column was built and
+  then taken out again by choice; it is worth knowing that total price is not
+  comparable across stay lengths, so a sort on Total ranks three-night breaks
+  above weeks rather than ranking value.
+- **"Since first seen" is measured over the watched window, not overnight.**
+  The sparkline beside it draws the same series, so the number and the picture
+  always agree; its key is `source|resortId|departure|nights`, the series
+  identity, which merges Issta's several same-price-shape rows into one line.
+  A move under 0.05% prints a muted "0%" rather than "+0.0%", and an offer
+  seen only once prints a dash — the column is empty until the history query
+  lands, and the table never waits for it.
+- **The header is two different headers.** Closed, it is one nowrap line with
+  4px of padding and no minimum height at all (`HEADER_HEIGHT_PX.bare` and
+  `HEADER_CONTENT_MIN_PX.bare` are both 0) — about 25px, which is the text and
+  nothing else. A label too long for its column widens the column rather than
+  wrapping to a second line, which is why `change` is 142px: "Since first
+  seen" on one line is the constraint, not the cell content. Open, the labels
+  wrap again and the header grows to hold the filter controls.
+- **Widths live in `columnSizing`, not in the column definitions.** This is
+  what makes opening the filters instant. A `size` computed from
+  `showColumnFilters` puts the toggle in the `columns` memo's dependencies,
+  so every toggle rebuilt all fifteen definitions and re-rendered every
+  visible cell — 150 rows of work before anything moved. MRT reads widths
+  from the `columnSizing` state, which only rewrites CSS variables on the
+  table element: no definition is touched and no cell re-renders.
+  `WIDTH_KEY_BY_COLUMN_ID` maps each column id onto its `COLUMN_WIDTH` key,
+  because the ids and the width keys were never the same words (`brandSlug`
+  / `brand`, `date` / `dates`, `propertyType` / `type`). The `useTransition`
+  around `showColumnFilters` stays as a second line of defence, with
+  `filtersWanted` driving the button so the press itself can never wait.
+- **The filter row is closed by default**, behind a Filters button carrying
+  the count of active filters. Open, it costs 104px of header — a fifth of the
+  visible table before a single row. **Columns carry two widths**: `COLUMN_WIDTH`
+  is what the cell content needs, and `FILTER_ROW_WIDTH` widens the handful of
+  columns whose filter control is bigger than their text — Dates needs 336px
+  for two 16px date inputs against 196 for "22 Nov → 29 Nov", and Total needs
+  158 for a min/max pair against 126. Closed, that buys back about 240px,
+  which is two more columns on screen. Shrinking the open widths instead
+  clips the native date control to "mm/dd/y", which is the trap recorded
+  under the 16px rule.
+- **A row is a button.** It carries `tabIndex`, `role="button"` and Enter/Space
+  handling as well as the click, because the only way to open an offer used to
+  be a mouse. **The row, not the cell, carries the background** — hover
+  included — so the pinned Open column can take `bgcolor: "inherit"` and look
+  like every other cell while still being opaque enough to occlude what
+  scrolls under it. Give that cell a colour of its own and it stops following
+  the hover, which is what made it read as a separate rail.
+- **The toolbar is deliberately thin.** `renderToolbarInternalActions` renders
+  only the column show/hide and full-screen buttons: the density toggle is
+  off, and MRT's own filter toggle is gone because the Filters button beside
+  it does the same thing. The Travelling picker lost its tooltip for the same
+  reason — the rule it explained ("operators sell a room, not a seat") is
+  written in the offer sheet, where someone deciding actually reads it.
 - **Hotels.** Rows share a `hotelKey` when they are the same property across
   operators (see Backend/src/hotels). `features/offers/lib/hotelLabels.ts` picks one display
   name per key, so a hotel reads and filters as one hotel whatever each
@@ -456,10 +567,75 @@ operator; and Club Med's stored prices jumped ~40% between the 17 Oct snapshot
 and a live call, which is either an October sale or a collection fault and is
 worth a look.
 
+## The price band
+
+`features/analytics/swarm` opens the analytics page on both surfaces: every
+tracked offer as one dot — across is the week it departs, up is what it costs
+a night per person — replaying every collected night on a loop, with no
+control to press. It holds still while the pointer is on it, while the tab is
+hidden and while it is scrolled off screen, and under reduced motion it draws
+the latest night once and never animates.
+
+- **The dots are canvas, the frame is SVG.** Around 3,100 offers are drawn per
+  night, which is four times what the budget below contemplates: as SVG that
+  is 3,100 elements reconciled and re-laid-out every frame, and it janks. The
+  canvas sits under an SVG overlay that carries the axes, so the frame stays
+  crisp and the axes stay still. Dots are batched into 17 colour buckets and
+  painted as 17 paths, not 3,100 fills.
+- **Positions tween, colour snaps** — the same rule as the SVG charts, and the
+  reason colour is resolved from the night being moved *to* before the move
+  starts.
+- **Price is on a log axis.** The range is €46 to €1,823 a night; on a linear
+  axis nineteen offers in twenty sit in the bottom third and nothing can be
+  read. Ticks are an explicit ladder (`PRICE_TICK_LADDER`) because d3's log
+  ticks print every integer multiple and the labels collide.
+- **Dots carry a fixed, hashed jitter of under half a day.** Operators sell
+  Saturday departures, so without it a week's worth of offers is one vertical
+  line. Hashed from the offer key so it never shimmers between frames.
+- **Colour has a noise floor.** Under 2% an offer is drawn neutral; the ramp
+  saturates at the 75th percentile of the moves above that floor. Scaled to
+  the largest move instead, a typical 3% change is indistinguishable from no
+  change at all and the whole cloud reads as grey.
+- **An offer is drawn on a night only if its operator's latest collection on
+  or before that night actually listed it.** Carrying a price forward past a
+  collection that omitted the offer invents an offer that was not on sale;
+  dropping it on a night the operator simply did not run would blank a sixth
+  of the cloud. This is the same "still on sale is per operator" rule the rest
+  of the app follows.
+- **The band starts at the first night whose offers are still recognisable on
+  the next one.** See the identity note under Data.
+
+## When each operator is cheapest
+
+`OperatorSeasonLines` is the analytics page's season chart, and the only one
+on a brand page besides the spread. One line per operator following the
+cheapest night it sells for each departure week, in that operator's own brand
+colour, over a log price axis.
+
+- **It replaced two charts, not one.** "When in the season to go" drew the
+  market as a single line, which hid the fact that the market is six
+  businesses with different price floors; "What changed since the last price
+  check" was a top-five list that the table's own change column now covers per
+  row. `MoversDumbbell` and `MarketIndexLine` were deleted at the same time —
+  both had been written, maintained and never rendered anywhere.
+- **Every week an operator actually sells carries a dot.** Pingwin lists 289
+  offers across just **four** departure weeks, so without the dots its line
+  looks like a broken render rather than an operator that sells four fixed
+  dates. The dots are the same convention as the offer price history: a mark
+  means a reading, a gap means no reading.
+- **The line breaks over weeks an operator does not sell** (`line.defined`)
+  rather than running straight through them, for the same reason.
+- **The price domain comes from the data, never from a seeded floor.** It was
+  first written `Math.min(...values, 1)`, which pins the low at €1 whatever
+  the data says and crams every line into the top third of the band.
+- Hovering the chart gives every operator's price for the nearest week, sorted
+  cheapest first; hovering a legend entry fades the other lines.
+
 ## Charts — house rules
 
 All charts are hand-rolled SVG: d3 does the maths, React renders. Before
-touching one, read `features/analytics/charts/components/MoversDumbbell.tsx` and `SeasonBand.tsx`.
+touching one, read `features/analytics/charts/components/OperatorSeasonLines.tsx` and
+`CheapestResorts.tsx`.
 
 - Wrap every chart in `ChartCard` with a title, a how-to-read subtitle, and a
   **table view** (`tableRows`/`tableColumns`). The table is the accessibility
@@ -498,6 +674,18 @@ Rows carry `resort` (canonical English), `resortKey`, `hotel`, `board` and
 The snapshot scrubber (`features/analytics/hooks/useSnapshotCursor.ts`) slices the index by
 day, so every chart below it rewinds together.
 
+**Offer identity is not stable across the whole stored history.** The resort
+and hotel backfills were run on different nights, and `nights` arrived
+mid-season, so on some boundary nights every key changed at once: Club Med
+shares 0% of its keys between 17 and 18 Oct and 36% between 19 and 20 Oct,
+Skideal 0% across three separate boundaries, Ofir Tours 0% between 19 and 20
+Oct. From 21 Oct every source holds above 90%. Anything that compares an offer
+with its own past has to cope: the market index already does, because no
+overlap carries it forward unchanged, and the swarm trims its leading nights
+until consecutive ones share at least half their offers (`MIN_IDENTITY_OVERLAP`),
+which is why it shows ten nights and not sixteen. Re-running a backfill over
+the whole of `data/` would heal it properly.
+
 ## Rules the code no longer states out loud
 
 These used to live as comments above the functions that enforce them. The
@@ -526,12 +714,6 @@ reported as a price move.
 
 **"Still on sale" is per operator, not global.** Operators don't collect on the
 same night, so a single latest-day cutoff marks five of six sources sold out.
-
-**The movers chart caps a resort at two rows.** Operators reprice a whole
-resort at once, so an unfiltered ranking is six consecutive weeks at one resort
-that all moved the same amount — six rows spending the card on one fact. It
-ranks by percentage, not euros, so a €200 cut on a Bulgarian long weekend stays
-in the running against a €2,000 swing on a Val d'Isère week.
 
 **Search compares skeletons, not strings.** Nobody types the diacritics, nobody
 matches an operator's capitalisation, and nobody remembers whether the hotel is
@@ -568,6 +750,14 @@ against "yesterday", so a night a source failed to collect doesn't fabricate a
 jump. Signed percentages always carry their sign, with U+2212 rather than a
 hyphen so the minus is the same width as the plus; a bare "4.2%" reads as a
 level.
+
+**Today's date is rendered after mount, never during it.** `TodayStamp` is the
+right-hand end of the hero's eyebrow line, sharing a row with "Alpine price
+intelligence", and its first paint is empty. The server and the browser are in
+different time zones and render at different instants, so a date put into the
+server HTML is a hydration mismatch waiting for midnight. It is `variant:
+"overline"` like the eyebrow it sits beside, baseline-aligned, so the two read
+as one line rather than as a caption that happens to be nearby.
 
 **Stored UI state is read after mount, never during render.** Saved views, the
 theme choice and the last-used filters all live in `localStorage`, which does

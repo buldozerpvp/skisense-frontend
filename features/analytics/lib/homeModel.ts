@@ -271,3 +271,51 @@ const quantileOf = (sorted: number[], p: number): number => {
   const upper = Math.ceil(position);
   return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
 };
+
+export interface OperatorWeek {
+  weekStart: DayISO;
+  cheapestPerNight: number;
+}
+
+export interface OperatorSeason {
+  source: string;
+  brandName: string;
+  color: string;
+  weeks: OperatorWeek[];
+  cheapest: number;
+}
+
+export const operatorSeasons = (offers: HomeOffer[], minWeeks = 2): OperatorSeason[] => {
+  const bySource = new Map<string, Map<DayISO, number>>();
+  for (const offer of offers) {
+    const week = weekStartOf(offer.departure);
+    let weeks = bySource.get(offer.source);
+    if (!weeks) {
+      weeks = new Map<DayISO, number>();
+      bySource.set(offer.source, weeks);
+    }
+    const current = weeks.get(week);
+    if (current === undefined || offer.perNight < current) weeks.set(week, offer.perNight);
+  }
+
+  return [...bySource.entries()]
+    .map(([source, weeks]) => {
+      const brand = getBrand(source);
+      const ordered = [...weeks.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([weekStart, cheapestPerNight]) => ({ weekStart, cheapestPerNight }));
+      return {
+        source,
+        brandName: brand?.name ?? source,
+        color: brand?.color ?? "#64748B",
+        weeks: ordered,
+        cheapest: Math.min(...ordered.map((week) => week.cheapestPerNight)),
+      };
+    })
+    .filter((season) => season.weeks.length >= minWeeks)
+    .sort((a, b) => a.cheapest - b.cheapest);
+};
+
+export const seasonWeekStarts = (seasons: OperatorSeason[]): DayISO[] => {
+  return [...new Set(seasons.flatMap((season) => season.weeks.map((week) => week.weekStart)))].sort();
+};

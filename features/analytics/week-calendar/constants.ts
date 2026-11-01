@@ -1,0 +1,17 @@
+export const WEEK_CALENDAR_MIN_FRAMES = 2;
+export const MIN_IDENTITY_OVERLAP = 0.5;
+export const SKI_WEEK_NIGHTS = [6, 7];
+export const CALENDAR_ROWS = 13;
+export const ROW_HEIGHT_PX = 22;
+export const ROW_LABEL_WIDTH_PX = 168;
+export const MONTH_LABEL_HEIGHT_PX = 20;
+export const LEGEND_HEIGHT_PX = 26;
+export const CELL_GAP_PX = 2;
+export const CELL_RADIUS_PX = 2;
+export const BEST_WEEK_DOT_RADIUS_PX = 3;
+export const PRICE_LOW_PERCENTILE = 0.15;
+export const PRICE_HIGH_PERCENTILE = 0.85;
+export const NIGHT_HOLD_MS = 1420;
+export const NIGHT_FADE_MS = 900;
+export const LOOP_REST_MS = 1800;
+export const MOVE_NOISE_PCT = 2;

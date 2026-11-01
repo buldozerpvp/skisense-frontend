@@ -5,3 +5,5 @@ export const APP_LOGO_SRC = "/skisense-logo.png";
 export const APP_LOGO_ALT = `${APP_NAME} logo`;
 
 export const MOBILE_MAX_WIDTH_PX = 899.95;
+
+export const ANALYTICS_PILL_LABEL_PX = 86;

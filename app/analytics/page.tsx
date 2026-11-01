@@ -1,23 +1,35 @@
 import { Box, Container } from "@mui/material";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import { SectionHeading } from "@/features/app-shell/components/SectionHeading";
-import { AnalyticsSection } from "@/features/analytics/components/AnalyticsSection";
 import { Responsive } from "@/features/app-shell/components/Responsive";
-import { AnalyticsScreen } from "@/features/analytics/components/AnalyticsScreen";
+import { AnalyticsPane } from "@/features/analytics/components/AnalyticsPane";
 
 const AnalyticsPage = () => {
   return (
     <Responsive
-      mobile={<AnalyticsScreen />}
+      mobile={
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            overflowY: "auto",
+            px: 2,
+            py: 2,
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          <AnalyticsPane />
+        </Box>
+      }
       desktop={
         <Container maxWidth="xl" sx={{ py: { xs: 4, md: 6 }, px: { xs: 2, md: 3 } }}>
           <Box component="section">
             <SectionHeading
               icon={<InsightsRoundedIcon fontSize="small" />}
               title="Price analytics"
-              subtitle="What a ski week costs right now, what changed overnight — press play to watch it move."
+              subtitle="Every tracked offer replaying across the nights it was collected, then what a ski week costs right now and when each operator is cheapest."
             />
-            <AnalyticsSection />
+            <AnalyticsPane />
           </Box>
         </Container>
       }

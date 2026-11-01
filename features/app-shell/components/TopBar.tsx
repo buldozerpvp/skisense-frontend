@@ -20,6 +20,7 @@ import { APP_LOGO_ALT, APP_NAME } from "@/features/app-shell/constants";
 import { SkiSenseMark } from "@/features/app-shell/components/SkiSenseMark";
 import { COLORS, FONT_DISPLAY } from "@/shared/design/tokens";
 import { useThemeMode } from "@/features/app-shell/hooks/useThemeMode";
+import { AnalyticsPill } from "@/features/app-shell/components/AnalyticsPill";
 
 const LOGO_SIZE = 34;
 
@@ -65,6 +66,7 @@ export const TopBar = () => {
                 All brands
               </Button>
             )}
+            <AnalyticsPill />
             <Tooltip title={mode === "dark" ? "Switch to light" : "Switch to dark"}>
               <IconButton
                 onClick={toggle}

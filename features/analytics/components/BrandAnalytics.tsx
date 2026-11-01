@@ -6,6 +6,7 @@ import Grid from "@mui/material/Grid2";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import { motion } from "framer-motion";
 import { useAllOffers, useLatestOffers } from "@/features/prices/hooks/usePrices";
+import { buildHomeModel, operatorSeasons } from "@/features/analytics/lib/homeModel";
 import {
   brandHasData,
   brandHeadline,
@@ -21,9 +22,7 @@ import { paxOf, totalPrice } from "@/features/offers/lib/pricing";
 import { SectionHeading } from "@/features/app-shell/components/SectionHeading";
 import { AnimatedNumber } from "@/shared/charts/components/AnimatedNumber";
 import { BrandResortSpread } from "@/features/analytics/charts/components/BrandResortSpread";
-import { ChangeBoard } from "@/features/analytics/charts/components/ChangeBoard";
-import { SeasonBand } from "@/features/analytics/charts/components/SeasonBand";
-import { buildHomeModel, seasonWeeks, topMoves } from "@/features/analytics/lib/homeModel";
+import { OperatorSeasonLines } from "@/features/analytics/charts/components/OperatorSeasonLines";
 
 const asEur = (value: number) => eur(value);
 const asCount = (value: number) => String(Math.round(value));
@@ -47,13 +46,10 @@ export const BrandAnalytics = ({ slug, showHeading = true }: BrandAnalyticsProps
   const index = useMemo(() => brandSeriesIndex(history, slug), [history, slug]);
   const spreads = useMemo(() => resortSpreads(rows, slug), [rows, slug]);
   const headline = useMemo(() => brandHeadline(rows, index, slug), [rows, index, slug]);
-
-  const model = useMemo(
-    () => buildHomeModel((history ?? []).filter((s) => s.source === slug)),
+  const seasons = useMemo(
+    () => operatorSeasons(buildHomeModel((history ?? []).filter((source) => source.source === slug)).offers),
     [history, slug]
   );
-  const moves = useMemo(() => topMoves(model.movers, 5), [model.movers]);
-  const weeks = useMemo(() => seasonWeeks(model.offers), [model.offers]);
 
   if (!brandHasData(rows, index)) return null;
 
@@ -144,12 +140,9 @@ export const BrandAnalytics = ({ slug, showHeading = true }: BrandAnalyticsProps
           snapshotDay={snapshotDay}
         />
 
-        {hasHistory ? (
-          <>
-            <ChangeBoard moves={moves} summary={model.summary} isFetching={isFetching} />
-            {weeks.length > 1 && <SeasonBand weeks={weeks} isFetching={isFetching} />}
-          </>
-        ) : (
+        {seasons.length > 0 && <OperatorSeasonLines seasons={seasons} isFetching={isFetching} />}
+
+        {hasHistory ? null : (
           <Alert severity="info" variant="outlined" icon={false} sx={{ borderRadius: 2 }}>
             <Typography variant="body2">
               We&apos;ve checked {operator} once so far

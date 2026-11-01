@@ -1,6 +1,6 @@
 "use client";
 
-import type { ScaleBand, ScaleLinear, ScaleTime } from "d3-scale";
+import type { ScaleBand, ScaleContinuousNumeric, ScaleLinear, ScaleTime } from "d3-scale";
 import { useChartColors, type ChartColors } from "@/shared/charts/lib/palette";
 
 const tickStyle = (colors: ChartColors) => {
@@ -62,16 +62,18 @@ export const AxisLeft = ({
   scale,
   width,
   tickCount = 5,
+  values,
   format,
 }: {
-  scale: ScaleLinear<number, number>;
+  scale: ScaleContinuousNumeric<number, number>;
   width: number;
   tickCount?: number;
+  values?: number[];
   format?: (value: number) => string;
 }) => {
   const colors = useChartColors();
   const TICK_STYLE = tickStyle(colors);
-  const ticks = scale.ticks(tickCount);
+  const ticks = values ?? scale.ticks(tickCount);
   const formatter = format ?? scale.tickFormat(tickCount);
 
   return (

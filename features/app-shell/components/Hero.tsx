@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { useLatestOffers } from "@/features/prices/hooks/usePrices";
 import { BRANDS } from "@/features/brands/constants";
 import { COLORS, DURATION, EASING, RADIUS } from "@/shared/design/tokens";
+import { TodayStamp } from "@/features/app-shell/components/TodayStamp";
 
 const useHeroStats = () => {
   const { data, isLoading } = useLatestOffers();
@@ -61,12 +62,18 @@ export const Hero = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: DURATION.slow, ease: EASING }}
         >
-          <Typography
-            variant="overline"
-            sx={{ color: COLORS.sky, display: "block", mb: 1 }}
+          <Stack
+            direction="row"
+            alignItems="baseline"
+            justifyContent="space-between"
+            spacing={2}
+            sx={{ mb: 1 }}
           >
-            Alpine price intelligence
-          </Typography>
+            <Typography variant="overline" sx={{ color: COLORS.sky }}>
+              Alpine price intelligence
+            </Typography>
+            <TodayStamp />
+          </Stack>
           <Typography
             variant="h2"
             sx={{ fontSize: { xs: 32, sm: 42, md: 50 }, maxWidth: 760, lineHeight: 1.1 }}
