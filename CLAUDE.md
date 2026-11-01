@@ -142,8 +142,84 @@ Rules worth keeping:
   dark mode, which is exactly how the hero tiles broke.
 - Shadows are a light-mode device. `DARK_SHADOWS` swaps them for a hairline
   edge, because a shadow on a dark ground is invisible.
+- **A hover surface is a token, not `hover:bg-white`.** The brand tiles lift
+  to white in light mode and to `tileHover` — 20% of the deep navy `#0E3A66`
+  — in dark, where white was a glaring card on a navy page. Any Tailwind
+  hover colour needs the same treatment: a palette entry, a line in the
+  `@theme` block of `app/globals.css`, then the class.
+- **Tooltips have their own token.** They were painted in `COLORS.ink`, which is
+  the right dark navy in light mode and near-white in dark — with MUI's white
+  tooltip text on top, every tooltip in dark mode was a blank white pill.
+  `tooltip` is `#0C2742` in light and the deeper blue `#13457A` in dark, and
+  the text is a fixed white in both, because the ground is dark in both.
 - White on a brand-coloured gradient (`BrandHero`, `ComingSoon`) stays white
   in both themes — the ground under it is the brand colour, not the surface.
+
+## The sky
+
+Clouds sail across and a blizzard blows behind every page, in both themes, in
+pure CSS: `SkyBackdrop` renders the empty elements and `app/globals.css` does
+the rest under the `.ss-sky` rules.
+
+- **Clouds are built the way clouds are lit, not as blurred ovals.** Each one
+  is three stacked layers drawn from the same 200px circle and a list of
+  `box-shadow` puffs (a shadow with a spread is just a bigger circle,
+  `currentColor` sets the colour): a darker, heavily blurred **shade** along
+  the base, the white **body**, and a brighter **light** layer shifted up and
+  left so every billow is lit from one side. Two shapes — a towering
+  `cumulus` and a long, low `strato` — scaled into four instances.
+- **Depth is atmospheric perspective.** Far clouds are smaller, fainter and
+  slower; the near one, `--hero`, is a 1.25× cumulus that crosses the middle
+  of the screen in 130 seconds, slow enough to read as weather and fast
+  enough that you see it move. Negative `animation-delay`s put every cloud
+  mid-journey on first paint, so the sky is never empty while it waits.
+- **Everything moves by transform** — `ss-sail` for clouds, `ss-blow` for
+  snow — so a blurred layer is rasterised once and slid. Snow is three
+  repeating flake tiles, each one tile wider than the viewport and moved by
+  exactly one tile a cycle so the loop is seamless, two tiles left for every
+  one down: a blizzard slant, the same way the clouds go. On top of that the
+  individual `translate` property sways each layer side to side and the near
+  layer's opacity rises and falls in gusts — `translate` composes with
+  `transform`, so the two motions never fight.
+- **Colours are palette tokens**: `skyTop` (a faint gradient at the top of
+  the viewport — in light mode it is what lets white clouds read at all),
+  `cloud`, `cloudLight`, `cloudShade`, `snow`. Night clouds are moonlit:
+  translucent bodies, pale tops, near-black bases.
+- **Stacking: the sky is `position: fixed; z-index: 0`, and the page content
+  wrapper in `app/layout.tsx` is `position: relative; z-index: 1`.** A
+  negative z-index on the sky does not work: `html` and `body` both carry the
+  canvas colour, so body's own background is painted after negative layers
+  and hides them. Modals, drawers, menus and tooltips portal to `body` and
+  keep their own z-indexes above all of it.
+- **The offers table is frosted glass so the hero cloud can be seen passing
+  behind it.** Its Paper is transparent; the glass (`glass` token, ~60%
+  surface, plus `GLASS_BLUR`) is a `::before` *behind* the content, rows are
+  transparent, the toolbars are translucent frost, and the sticky header
+  stays opaque, because rows scroll under it. The glass lives on a
+  pseudo-element rather than on the Paper because **an element with
+  `backdrop-filter` becomes a backdrop root**: with the blur on the Paper,
+  the pinned Open column's own blur could only see the inside of the table,
+  not the sky, and rendered as a darker strip. Off the Paper, the pinned
+  cell blurs everything behind it — sky, glass and the cells scrolled under
+  it — so it looks like every other cell at rest and turns sideways-scrolled
+  text into an invisible haze. `isolation: isolate` keeps the `z-index: -1`
+  pseudo inside the Paper without making a new backdrop root.
+- **What it costs.** Measured in headless Chromium, which has no GPU and
+  composites on the CPU: the animated sky adds roughly 50–100ms to each
+  keystroke in the table search, and the glass blur itself adds little on
+  top. On a machine compositing on a graphics card, sliding pre-rasterised
+  layers is close to free — but if typing ever feels heavy, this is the
+  first suspect: hide `.ss-sky` and measure again.
+- **Phones get no sky.** Below 900px (`MOBILE_MAX_WIDTH_PX`) `.ss-sky` is
+  `display: none` and `MobileShell` keeps its own opaque canvas fill. It was
+  tried: the phone list's alternate rows are translucent, so clouds passing
+  behind a dense list turned every other row into a smeared window — busy
+  rather than atmospheric — and a full-screen animation is battery a phone
+  should not spend on decoration. `display: none` rather than merely covering
+  it, so nothing is animated off-screen either.
+- Under `prefers-reduced-motion` the clouds stop where they are (paused, so
+  the negative delays still leave them on screen) and the snow is not drawn;
+  it is all hidden when printing.
 
 ## The brand mark
 
@@ -245,6 +321,29 @@ brings its own header and bottom bar.
 - **Chips select, they don't deselect.** Tapping an operator chip while
   nothing is filtered sets that one operator. Emptying a chip group goes back
   to "all" rather than leaving a blank list with no way out.
+- **The filter sheet closes on a swipe down from its top**, as well as on a
+  tap outside. `useSwipeToClose` (`features/offers/filtering/hooks`) puts
+  pointer handlers on the grab handle and the title row — not the scrolling
+  list, which must stay a list — and drags the Paper with an inline
+  `transform` as the finger moves. Let go past `SWIPE_CLOSE_FRACTION` of the
+  sheet's height, or flick faster than `SWIPE_CLOSE_VELOCITY`, and it calls
+  `onClose`; anything less springs back. Speed is measured over the last
+  `SWIPE_VELOCITY_WINDOW_MS`, not the last pointer event: one event is a
+  few milliseconds and a few pixels, and a real flick measured that way
+  came out under the threshold. On close the inline transition is cleared
+  first, so MUI's own exit slide starts from wherever the finger left the
+  sheet instead of jumping back up. `touch-action: none` on the drag zone
+  stops the browser treating the gesture as a scroll or pull-to-refresh;
+  presses that start on a button are ignored, so "Reset all" is still a tap.
+  **The drag zone also cancels its own `touchmove` events**, through a
+  native listener registered with `passive: false` (React's touch handlers
+  are passive and cannot). `touch-action: none` alone was not enough: a fast
+  swipe that ran off the bottom of the screen still left Chrome's gesture
+  recogniser holding a fling, and Chrome spends the next tap stopping that
+  fling and swallows its click — so the Filters button needed two taps for
+  about a second after every swipe-close. Cancelling the moves means no
+  fling is ever started. Do not put the same on `touchstart`: that would
+  cancel the click on "Reset all".
 - **Resort and Hotel are drill-in pickers** (`ValuePicker`), not chip rows:
   hundreds of values each. Select all / None live in the list *header*, never
   as list rows — inside the list is exactly what made the desktop All button
@@ -270,6 +369,13 @@ drifted apart by the second change, so there is only one.
   same expression as `key` in `features/offers/lib/offerModel.ts`** — they are built from
   the same snapshot rows by different paths, and the day they disagree the
   drawer opens empty.
+- **The drawer sits at `zIndex.modal`, not MUI's default `zIndex.drawer`.**
+  MRT's full-screen table is a fixed Paper at `theme.zIndex.modal` (1300); a
+  Drawer defaults to 1200, so clicking a row in full screen opened the panel
+  *behind* the table. It is raised to exactly 1300, not 1301: at equal
+  z-index the later portal wins, so the drawer lands over the table, and the
+  resort card or full-screen map opened from inside the drawer — portalled
+  later still — lands over the drawer. At 1301 the drawer would cover them.
 - **The resort name keeps its own click**, with `stopPropagation`, because the
   resort and the offer are two different questions. Everywhere else on the row
   opens the offer.
@@ -402,6 +508,34 @@ whatever that map holds, so adding a source later is a data job, not a UI one.
   party size resets the page and scrolls back to the top — a grown page held
   across a filter change would show a jarringly long list of a suddenly small
   result.
+- **Searching costs one render, after you stop typing.** Measured before the
+  fix in a production build: 600–1,800ms of blocked main thread *per
+  keystroke* and six seconds to settle on "tignes". Three causes, three fixes:
+  - **The search box owns its own text.** `TableSearch` keeps the value in
+    local state, so a keystroke re-renders the input and nothing else, and it
+    hands the text to the store only after `SEARCH_SETTLE_MS` without
+    another key. The table used to re-render on every character. Do not
+    move this onto `useTransition` or `useDeferredValue`: the store is
+    zustand, and `useSyncExternalStore` updates always render synchronously,
+    so neither would actually defer anything.
+  - **Rows are searched against a prebuilt haystack.** `haystacks` is built
+    once per data load — each row's resort, hotel, board and country run
+    through `searchKey` — and a query is then a handful of `includes` per
+    row. `matchesQuery` used to re-normalise all six fields of all ~3,400
+    rows on every keystroke. Same matching rules either way; they live in
+    `offerSearch.ts` as `queryWords` / `searchHaystack` / `matchesWords`.
+  - **A search never rebuilds the columns.** The filter dropdown options and
+    the hotel display labels come from `brandRows`, not the search result.
+    Built from the search result, every keystroke changed them, and they are
+    in the `columns` memo's dependencies — so all fifteen column definitions
+    and every visible cell were rebuilt per character. A dropdown that lists
+    every resort whatever you typed is also simply the expected behaviour.
+  The page also drops back to the first 50 rows **in the same render** as
+  the change, through the set-state-during-render pattern on `shownShape`,
+  rather than in an effect after it. From an effect, a scrolled-out page of
+  250 rows was rendered against the new result first and only then cut to
+  50 — two full table renders for one search. After: 10–20ms a keystroke
+  and about half a second to the new rows on the sandbox's slow CPU.
 - **The table sorts by departure date.** A € a night column was built and
   then taken out again by choice; it is worth knowing that total price is not
   comparable across stay lengths, so a sort on Total ranks three-night breaks
@@ -413,32 +547,66 @@ whatever that map holds, so adding a source later is a data job, not a UI one.
   A move under 0.05% prints a muted "0%" rather than "+0.0%", and an offer
   seen only once prints a dash — the column is empty until the history query
   lands, and the table never waits for it.
-- **The header is two different headers.** Closed, it is one nowrap line with
-  4px of padding and no minimum height at all (`HEADER_HEIGHT_PX.bare` and
-  `HEADER_CONTENT_MIN_PX.bare` are both 0) — about 25px, which is the text and
-  nothing else. A label too long for its column widens the column rather than
-  wrapping to a second line, which is why `change` is 142px: "Since first
-  seen" on one line is the constraint, not the cell content. Open, the labels
-  wrap again and the header grows to hold the filter controls.
-- **Widths live in `columnSizing`, not in the column definitions.** This is
-  what makes opening the filters instant. A `size` computed from
-  `showColumnFilters` puts the toggle in the `columns` memo's dependencies,
-  so every toggle rebuilt all fifteen definitions and re-rendered every
-  visible cell — 150 rows of work before anything moved. MRT reads widths
-  from the `columnSizing` state, which only rewrites CSS variables on the
-  table element: no definition is touched and no cell re-renders.
-  `WIDTH_KEY_BY_COLUMN_ID` maps each column id onto its `COLUMN_WIDTH` key,
-  because the ids and the width keys were never the same words (`brandSlug`
-  / `brand`, `date` / `dates`, `propertyType` / `type`). The `useTransition`
-  around `showColumnFilters` stays as a second line of defence, with
-  `filtersWanted` driving the button so the press itself can never wait.
+- **Opening the filters is a CSS change, not a React render.** MRT is told
+  `showColumnFilters: true` permanently, so every filter control mounts once
+  with the table and stays mounted — that is the preload. Whether the row is
+  *seen* is one attribute, `data-filter-row="open" | "closed"`, on the table's
+  Paper. The Filters button writes it through the `useFilterRow` store, and
+  `OffersTable` applies it from a `useFilterRow.subscribe` callback straight
+  onto `tablePaperRef` — synchronously, inside the click, before React has
+  re-rendered anything. Only `FiltersToggle` subscribes to the store's state,
+  so the only component that re-renders on a toggle is the button itself.
+  Measured in a production build: about 1ms of script per toggle, the rest
+  is the browser re-laying the visible rows.
+  Everything that differs between the two states lives in
+  `features/offers/lib/filterRowSx.ts`, keyed off that attribute: header
+  heights and padding, label wrapping, the filters' `display`, and the wider
+  filter-row widths. Widths go in as **`!important` overrides of MRT's own
+  CSS variables** (`--header-<id>-size`, `--col-<id>-size`) on the `<table>`
+  — MRT writes those variables inline, and an important declaration in a
+  stylesheet outranks a normal inline one, so a width change needs no React
+  state at all. `WIDTH_KEY_BY_COLUMN_ID` maps column ids onto `COLUMN_WIDTH`
+  keys, because the two were never the same words (`brandSlug` / `brand`,
+  `date` / `dates`, `propertyType` / `type`); a new column needs an entry or
+  it keeps its closed width when the filters open.
+  Three things were tried before this and each left a visible wait: a
+  `useTransition` (stopped the click blocking, not the work), moving widths
+  out of the column definitions into `columnSizing` state (stopped the
+  definitions rebuilding, but MRT's filter `Collapse` still mounted thirteen
+  filter controls and animated their height on every open), and the original
+  `size` computed from the toggle (rebuilt all fifteen definitions).
+- **Header labels are centred vertically when closed and top-aligned when
+  open.** Closed, the header is one nowrap line with 4px of padding and no
+  minimum height — about 33px, the text and nothing else. Open, labels sit at
+  the top, wrap again, and the filter controls are pushed to the bottom with
+  `margin-top: auto`, so every column's control lines up on one baseline
+  whatever its label does. A label too long for its column widens the column
+  rather than wrapping when closed, which is why `change` is 142px: "Since
+  first seen" on one line is the constraint, not the cell content.
+- **Nested `sx` keys replace, they do not merge.** `{...base, ...price}` where
+  both carry `"& .Mui-TableHeadCell-Content-Wrapper"` keeps only the price
+  version, which is how Total and Each lost their 13.5px bold label and sat
+  4px higher than every other header in a 24px MUI default line. The price
+  overrides are now spread *inside* each nested key, behind a `centred` flag.
+- **The sticky header is forced to `opacity: 1`.** MRT gives a sticky `thead`
+  0.97, which reads as nothing until the filters are open and a tall header
+  sits over scrolled rows — then the rows show through it clearly enough to
+  read. Same reason the pinned Open cell gets `opacity: 1` and loses MRT's
+  grey `::before` overlay: with both, its header is the same blue as the rest.
+- **Body rows carry `content-visibility: auto`** with an intrinsic height of
+  `BODY_ROW_ESTIMATE_PX`. A width change re-lays out every rendered row, and
+  this lets the browser skip the rows scrolled out of the 560px frame — it
+  took about 40% off the cost of opening the filters with fifty rows, and the
+  saving grows as endless scroll adds more.
 - **The filter row is closed by default**, behind a Filters button carrying
   the count of active filters. Open, it costs 104px of header — a fifth of the
   visible table before a single row. **Columns carry two widths**: `COLUMN_WIDTH`
   is what the cell content needs, and `FILTER_ROW_WIDTH` widens the handful of
   columns whose filter control is bigger than their text — Dates needs 336px
   for two 16px date inputs against 196 for "22 Nov → 29 Nov", and Total needs
-  158 for a min/max pair against 126. Closed, that buys back about 240px,
+  204 for a min/max pair against 126 — two number fields of at least 86px
+  each, because at 74px the browser's spinner arrows ate the digits and the
+  Max field ran out under the Each column. Closed, that buys back about 240px,
   which is two more columns on screen. Shrinking the open widths instead
   clips the native date control to "mm/dd/y", which is the trap recorded
   under the 16px rule.

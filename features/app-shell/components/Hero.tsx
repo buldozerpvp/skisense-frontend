@@ -42,7 +42,7 @@ export const Hero = () => {
         overflow: "hidden",
         borderBottom: "1px solid",
         borderColor: "divider",
-        background: `linear-gradient(170deg, ${COLORS.frost} 0%, ${COLORS.surface} 65%)`,
+        background: `linear-gradient(170deg, color-mix(in srgb, ${COLORS.frost} 70%, transparent) 0%, color-mix(in srgb, ${COLORS.surface} 55%, transparent) 65%)`,
       }}
     >
       <Box

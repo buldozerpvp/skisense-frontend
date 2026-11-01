@@ -12,6 +12,7 @@ import { useOfferFilters } from "@/features/offers/hooks/useOfferFilters";
 import { FLIGHT_FILTER_LABEL, type FlightStatus } from "@/features/offers/inclusions/lib/packageInclusions";
 import { BOARD_ICON, BOARD_LABEL, BOARD_ORDER, type BoardBasis } from "@/features/offers/inclusions/lib/board";
 import { ValuePicker } from "@/features/offers/filtering/components/ValuePicker";
+import { useSwipeToClose } from "@/features/offers/filtering/hooks/useSwipeToClose";
 import { FILTERABLE_PARTY_SIZES, FILTERABLE_PROPERTY_TYPES } from "@/features/offers/filtering/constants";
 
 export const FilterSheet = ({
@@ -28,6 +29,7 @@ export const FilterSheet = ({
   const set = useOfferFilters((state) => state.set);
   const reset = useOfferFilters((state) => state.reset);
   const [picker, setPicker] = useState<"resort" | "hotel" | null>(null);
+  const { paperRef, dragProps } = useSwipeToClose(onClose);
 
   const resortOptions = useMemo(
     () => countBy(offers, (offer) => offer.resortKey, (offer) => `${offer.resort} ${offer.flag}`),
@@ -93,6 +95,7 @@ export const FilterSheet = ({
         onClose={onClose}
         slotProps={{
           paper: {
+            ref: paperRef,
             sx: {
               height: "92dvh",
               bgcolor: COLORS.surface,
@@ -105,28 +108,33 @@ export const FilterSheet = ({
         }}
       >
         <Stack sx={{ height: "100%" }}>
-          <Box sx={{ pt: 1.2, pb: 0.3, display: "flex", justifyContent: "center" }} aria-hidden>
-            <Box sx={{ width: 40, height: 4, borderRadius: 999, bgcolor: COLORS.borderStrong }} />
-          </Box>
-
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            sx={{ px: 2.25, pt: 0.75, pb: 1.25, borderBottom: `1px solid ${COLORS.border}` }}
+          <Box
+            {...dragProps}
+            sx={{ flex: "0 0 auto", touchAction: "none", cursor: "grab", "&:active": { cursor: "grabbing" } }}
           >
-            <Typography sx={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 800, color: COLORS.ink }}>
-              Filters
-            </Typography>
-            <Box
-              component="button"
-              type="button"
-              onClick={reset}
-              sx={{ minHeight: 40, border: "none", bgcolor: "transparent", color: COLORS.brand, fontSize: 13.5, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
-            >
-              Reset all
+            <Box sx={{ pt: 1.2, pb: 0.3, display: "flex", justifyContent: "center" }} aria-hidden>
+              <Box sx={{ width: 40, height: 4, borderRadius: 999, bgcolor: COLORS.borderStrong }} />
             </Box>
-          </Stack>
+
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ px: 2.25, pt: 0.75, pb: 1.25, borderBottom: `1px solid ${COLORS.border}` }}
+            >
+              <Typography sx={{ fontFamily: FONT_DISPLAY, fontSize: 18, fontWeight: 800, color: COLORS.ink }}>
+                Filters
+              </Typography>
+              <Box
+                component="button"
+                type="button"
+                onClick={reset}
+                sx={{ minHeight: 40, border: "none", bgcolor: "transparent", color: COLORS.brand, fontSize: 13.5, fontWeight: 600, fontFamily: "inherit", cursor: "pointer" }}
+              >
+                Reset all
+              </Box>
+            </Stack>
+          </Box>
 
           <Box sx={{ flex: 1, overflowY: "auto", px: 2.25, WebkitOverflowScrolling: "touch" }}>
             <DrillRow

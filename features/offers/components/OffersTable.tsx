@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   MaterialReactTable,
   useMaterialReactTable,
@@ -13,9 +13,7 @@ import {
   type MRT_VisibilityState,
 } from "material-react-table";
 import {
-  Badge,
   Box,
-  Button,
   Chip,
   Typography,
   Avatar,
@@ -24,14 +22,11 @@ import {
   Link as MuiLink,
   MenuItem,
   TextField,
-  InputAdornment,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
 } from "@mui/material";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import { COLORS } from "@/shared/design/tokens";
 import {
   fitsParty,
@@ -61,22 +56,24 @@ import {
   COLUMN_ORDER,
   COLUMN_WIDTH,
   BOTTOM_BAR_MIN_PX,
-  FILTER_ROW_WIDTH,
-  HEADER_CONTENT_MIN_PX,
-  HEADER_HEIGHT_PX,
+  GLASS_BLUR,
+  FILTER_ROW_ATTR,
   PAGE_SIZE,
   PINNED_COLUMNS,
-  WIDTH_KEY_BY_COLUMN_ID,
   SCROLL_CHUNK,
   SCROLL_REACH_PX,
   PRICE_COLUMNS,
   PRICE_TINT_PCT,
   UNCHANGED_PCT,
 } from "@/features/offers/constants";
-import { matchesQuery } from "@/features/offers/lib/offerSearch";
+import { matchesWords, queryWords, searchHaystack } from "@/features/offers/lib/offerSearch";
 import { useAllOffers, useLatestOffers } from "@/features/prices/hooks/usePrices";
 import { buildOffers, type Offer } from "@/features/offers/lib/offerModel";
 import { OfferPanel } from "@/features/offers/offer-detail/components/OfferPanel";
+import { FiltersToggle } from "@/features/offers/components/FiltersToggle";
+import { TableSearch } from "@/features/offers/components/TableSearch";
+import { useFilterRow } from "@/features/offers/hooks/useFilterRow";
+import { filterRowPaperSx } from "@/features/offers/lib/filterRowSx";
 import { useOffersBrowsing } from "@/features/offers/hooks/useOffersBrowsing";
 import { BRANDS, getBrand } from "@/features/brands/constants";
 import type { OfferStatus, PriceRow, PropertyType } from "@/features/prices/lib/priceTypes";
@@ -127,14 +124,7 @@ const priceBlockSx = (columnId: string, surface: "head" | "body") => {
   const tint = PRICE_TINT_PCT[surface];
   return {
     textAlign: "center" as const,
-    justifyContent: "center",
-    ...(surface === "head"
-      ? {
-          "& .Mui-TableHeadCell-Content": { width: "100%", justifyContent: "center", alignItems: "center" },
-          "& .Mui-TableHeadCell-Content-Labels": { width: "auto", justifyContent: "center" },
-          "& .Mui-TableHeadCell-Content-Wrapper": { textAlign: "center" as const },
-        }
-      : {}),
+    ...(surface === "body" ? { justifyContent: "center" } : {}),
     bgcolor:
       surface === "head"
         ? `color-mix(in srgb, ${COLORS.brand} ${tint}%, ${COLORS.frost})`
@@ -150,7 +140,10 @@ const pinnedSx = (columnId: string, surface: "head" | "body") => {
   if (!PINNED_COLUMNS.includes(columnId)) return {};
   return {
     bgcolor: surface === "head" ? COLORS.frost : "inherit",
+    ...(surface === "body" ? { backdropFilter: GLASS_BLUR } : {}),
+    opacity: 1,
     zIndex: surface === "head" ? 4 : 3,
+    '&[data-pinned="true"]': { "&:before": { backgroundColor: "transparent", boxShadow: "none" } },
   };
 };
 
@@ -169,53 +162,33 @@ export const OffersTable = () => {
   const [openOfferKey, setOpenOfferKey] = useState<string | null>(null);
   const selectedBrands = useOffersBrowsing((s) => s.selectedBrands);
   const searchText = useOffersBrowsing((s) => s.searchText);
-  const setSearchText = useOffersBrowsing((s) => s.setSearchText);
 
   const [columnFilters, setColumnFilters] = useState<MRT_ColumnFiltersState>(DEFAULT_FILTERS);
   const [sorting, setSorting] = useState<MRT_SortingState>(DEFAULT_SORTING);
   const [party, setParty] = useState<PartyChoice>(2);
-  // The button answers at once and the table catches up. Toggling the filter
-  // row rebuilds every column definition, because the widths change, and that
-  // re-renders every visible cell — around 150 rows by 15 columns — so the
-  // click used to sit there for half a second before the button even looked
-  // pressed. `filtersWanted` is what the button draws itself from, so it flips
-  // immediately; `showColumnFilters` is what the table reads, and it moves
-  // inside a transition React is free to interrupt.
-  const [filtersWanted, setFiltersWanted] = useState(false);
-  const [showColumnFilters, setShowColumnFilters] = useState(false);
-  const [, startFilterTransition] = useTransition();
-
-  const applyShowFilters = useCallback((next: boolean) => {
-    setFiltersWanted(next);
-    startFilterTransition(() => setShowColumnFilters(next));
-  }, []);
   const [templates, setTemplates] = useState<FilterTemplate[]>([]);
   const [activeTemplateId, setActiveTemplateId] = useState("");
 
-  const matchingRows = useMemo<BrandedPriceRow[]>(() => {
-    let all: BrandedPriceRow[] =
+  const brandRows = useMemo<BrandedPriceRow[]>(() => {
+    const all: BrandedPriceRow[] =
       data?.flatMap((source) => source.data.map((row) => ({ ...row, brandSlug: source.source }))) ?? [];
+    return selectedBrands.length > 0 ? all.filter((r) => selectedBrands.includes(r.brandSlug)) : all;
+  }, [data, selectedBrands]);
 
-    if (selectedBrands.length > 0) {
-      all = all.filter((r) => selectedBrands.includes(r.brandSlug));
-    }
-    const query = searchText.trim();
-    if (query) {
-      all = all.filter((r) => {
+  const haystacks = useMemo(
+    () =>
+      brandRows.map((r) => {
         const badge = countryBadge(r.country);
-        return matchesQuery(
-          query,
-          r.resort,
-          r.hotel,
-          r.board,
-          r.country,
-          badge.name,
-          badge.code
-        );
-      });
-    }
-    return all;
-  }, [data, selectedBrands, searchText]);
+        return searchHaystack(r.resort, r.hotel, r.board, r.country, badge.name, badge.code);
+      }),
+    [brandRows]
+  );
+
+  const matchingRows = useMemo<BrandedPriceRow[]>(() => {
+    const words = queryWords(searchText);
+    if (words.length === 0) return brandRows;
+    return brandRows.filter((_, i) => matchesWords(words, haystacks[i]));
+  }, [brandRows, haystacks, searchText]);
 
   const partyCounts = useMemo(() => {
     const counts = new Map<number, number>();
@@ -259,35 +232,35 @@ export const OffersTable = () => {
     [detailOffers, openOfferKey]
   );
 
-  const resortOptions = useMemo(() => toOptions(matchingRows.map((r) => r.resort)), [matchingRows]);
+  const resortOptions = useMemo(() => toOptions(brandRows.map((r) => r.resort)), [brandRows]);
   const countryOptions = useMemo(
-    () => toOptions(matchingRows.map((r) => r.country)),
-    [matchingRows]
+    () => toOptions(brandRows.map((r) => r.country)),
+    [brandRows]
   );
-  const labels = useMemo(() => hotelLabels(matchingRows), [matchingRows]);
+  const labels = useMemo(() => hotelLabels(brandRows), [brandRows]);
   const hotelOptions = useMemo(
-    () => toOptions(matchingRows.map((r) => hotelLabelOf(r, labels))),
-    [matchingRows, labels]
+    () => toOptions(brandRows.map((r) => hotelLabelOf(r, labels))),
+    [brandRows, labels]
   );
   const typeOptions = useMemo(() => {
-    const present = new Set(matchingRows.map((r) => propertyTypeOf(r)));
+    const present = new Set(brandRows.map((r) => propertyTypeOf(r)));
     return (Object.keys(PROPERTY_TYPE_LABEL) as PropertyType[])
       .filter((t) => present.has(t))
       .map((t) => ({ label: `${PROPERTY_TYPE_ICON[t]} ${PROPERTY_TYPE_LABEL[t]}`, value: t }));
-  }, [matchingRows]);
+  }, [brandRows]);
   const paxOptions = useMemo(
     () =>
-      [...new Set(matchingRows.map((r) => paxOf(r)))]
+      [...new Set(brandRows.map((r) => paxOf(r)))]
         .sort((a, b) => a - b)
         .map((n) => ({ label: `${n} ${n === 1 ? "person" : "people"}`, value: String(n) })),
-    [matchingRows]
+    [brandRows]
   );
   const nightsOptions = useMemo(
     () =>
-      [...new Set(matchingRows.map((r) => resolveNights(r)).filter((n): n is number => Boolean(n)))]
+      [...new Set(brandRows.map((r) => resolveNights(r)).filter((n): n is number => Boolean(n)))]
         .sort((a, b) => a - b)
         .map((n) => ({ label: `${n} nights`, value: String(n) })),
-    [matchingRows]
+    [brandRows]
   );
 
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -342,21 +315,6 @@ export const OffersTable = () => {
     setActiveTemplateId("");
     storeActiveTemplateId("");
   }, []);
-
-  // The filter row needs wider columns, but a width that lives in the column
-  // definitions makes every toggle rebuild all fifteen of them and re-render
-  // every visible cell. MRT reads widths from `columnSizing` instead, which
-  // only rewrites CSS variables on the table element — no definition is
-  // touched, no cell re-renders, and opening the filters is immediate.
-  const columnSizing = useMemo(() => {
-    const sizing: Record<string, number> = {};
-    for (const [columnId, key] of Object.entries(WIDTH_KEY_BY_COLUMN_ID)) {
-      sizing[columnId] = showColumnFilters
-        ? FILTER_ROW_WIDTH[key] ?? COLUMN_WIDTH[key]
-        : COLUMN_WIDTH[key];
-    }
-    return sizing;
-  }, [showColumnFilters]);
 
   const columns = useMemo<MRT_ColumnDef<BrandedPriceRow>[]>(
     () => [
@@ -806,12 +764,19 @@ export const OffersTable = () => {
   });
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
+  const resultShape = { rowMode, columnFilters, sorting, searchText, party };
+  const [shownShape, setShownShape] = useState(resultShape);
+  const shapeChanged = (Object.keys(resultShape) as (keyof typeof resultShape)[]).some(
+    (key) => resultShape[key] !== shownShape[key]
+  );
+  if (shapeChanged) {
+    setShownShape(resultShape);
     setPagination({ pageIndex: 0, pageSize: rowMode === "scroll" ? SCROLL_CHUNK : PAGE_SIZE });
+  }
+
+  useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
   }, [rowMode, columnFilters, sorting, searchText, party]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   // rows.length is the unfiltered total, so it only ever over-estimates what
   // is left: the guard stops the page growing forever, and the row model
@@ -833,11 +798,13 @@ export const OffersTable = () => {
   const table = useMaterialReactTable({
     columns,
     data: rows,
-    state: { isLoading, columnFilters, sorting, columnVisibility, showColumnFilters, pagination, columnSizing },
+    state: { isLoading, columnFilters, sorting, columnVisibility, showColumnFilters: true, pagination },
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
-    onShowColumnFiltersChange: (updater: boolean | ((prev: boolean) => boolean)) =>
-      applyShowFilters(typeof updater === "function" ? updater(filtersWanted) : updater),
+    onShowColumnFiltersChange: (updater: boolean | ((prev: boolean) => boolean)) => {
+      const filterRow = useFilterRow.getState();
+      filterRow.setOpen(typeof updater === "function" ? updater(filterRow.open) : updater);
+    },
     onSortingChange: setSorting,
     onPaginationChange: setPagination,
     enableBottomToolbar: true,
@@ -863,41 +830,61 @@ export const OffersTable = () => {
       columnOrder: COLUMN_ORDER,
       columnPinning: { left: PINNED_COLUMNS },
     },
-    muiTableContainerProps: { ref: scrollRef, onScroll: handleScroll, sx: { maxHeight: 560 } },
-    muiTableHeadProps: { sx: { bgcolor: COLORS.frost } },
-    muiTableHeadRowProps: { sx: { bgcolor: COLORS.frost } },
-    muiTableHeadCellProps: ({ column }) => ({
+    muiTablePaperProps: {
       sx: {
-        bgcolor: COLORS.frost,
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        minHeight: showColumnFilters ? HEADER_HEIGHT_PX.withFilters : HEADER_HEIGHT_PX.bare,
-        pt: showColumnFilters ? 1.5 : 0.5,
-        pb: showColumnFilters ? 1 : 0.5,
-        px: 1.25,
-        "& .Mui-TableHeadCell-Content": {
-          width: "100%",
-          alignItems: "flex-start",
-          minHeight: showColumnFilters ? HEADER_CONTENT_MIN_PX.withFilters : HEADER_CONTENT_MIN_PX.bare,
+        ...filterRowPaperSx,
+        position: "relative",
+        isolation: "isolate",
+        bgcolor: "transparent",
+        backgroundImage: "none",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          inset: 0,
+          zIndex: -1,
+          borderRadius: "inherit",
+          bgcolor: COLORS.glass,
+          backdropFilter: GLASS_BLUR,
+          pointerEvents: "none",
         },
-        "& .Mui-TableHeadCell-Content-Labels": { width: "100%", gap: 0.25 },
-        "& .Mui-TableHeadCell-Content-Wrapper": {
-          fontSize: 13.5,
-          fontWeight: 700,
-          letterSpacing: "0.01em",
-          lineHeight: 1.25,
-          whiteSpace: showColumnFilters ? "normal" : "nowrap",
-          overflow: "visible",
-          textOverflow: "clip",
-        },
-        "& .MuiCollapse-root": { width: "100%", marginTop: "auto" },
-        "& .MuiInputBase-root": { fontSize: 13 },
-        "& .MuiFormLabel-root": { fontSize: 12 },
-        ...priceBlockSx(column.id, "head"),
-        ...pinnedSx(column.id, "head"),
       },
-    }),
+    },
+    muiTableContainerProps: { ref: scrollRef, onScroll: handleScroll, sx: { maxHeight: 560 } },
+    muiTableHeadProps: { sx: { bgcolor: COLORS.frost, opacity: 1 } },
+    muiTableHeadRowProps: { sx: { bgcolor: COLORS.frost } },
+    muiTableHeadCellProps: ({ column }) => {
+      const centred = PRICE_COLUMNS.includes(column.id);
+      return {
+        sx: {
+          bgcolor: COLORS.frost,
+          display: "flex",
+          flexDirection: "column",
+          px: 1.25,
+          "& .Mui-TableHeadCell-Content": {
+            width: "100%",
+            ...(centred ? { justifyContent: "center" } : {}),
+          },
+          "& .Mui-TableHeadCell-Content-Labels": {
+            width: centred ? "auto" : "100%",
+            gap: 0.25,
+            ...(centred ? { justifyContent: "center" } : {}),
+          },
+          "& .Mui-TableHeadCell-Content-Wrapper": {
+            fontSize: 13.5,
+            fontWeight: 700,
+            letterSpacing: "0.01em",
+            lineHeight: 1.25,
+            overflow: "visible",
+            textOverflow: "clip",
+            ...(centred ? { textAlign: "center" as const } : {}),
+          },
+          "& .MuiInputBase-root": { fontSize: 13 },
+          "& .MuiFormLabel-root": { fontSize: 12 },
+          ...priceBlockSx(column.id, "head"),
+          ...pinnedSx(column.id, "head"),
+        },
+      };
+    },
     muiTableBodyCellProps: ({ column }) => ({
       sx: {
         fontSize: 13.5,
@@ -923,17 +910,22 @@ export const OffersTable = () => {
         "aria-label": `Open ${offer.hotel ?? offer.resort}, departing ${offer.date}`,
         sx: {
           cursor: "pointer",
-          bgcolor: COLORS.surface,
-          "&:hover": { bgcolor: COLORS.frost },
+          bgcolor: "transparent",
+          "&:hover": { bgcolor: `color-mix(in srgb, ${COLORS.frost} 75%, transparent)` },
           "&:focus-visible": { outline: `2px solid ${COLORS.brand}`, outlineOffset: "-2px" },
         },
       };
     },
     muiFilterTextFieldProps: { placeholder: "Filter" },
-    muiTopToolbarProps: { sx: { bgcolor: COLORS.frost, borderBottom: `1px solid ${COLORS.border}` } },
+    muiTopToolbarProps: {
+      sx: {
+        bgcolor: `color-mix(in srgb, ${COLORS.frost} 70%, transparent)`,
+        borderBottom: `1px solid ${COLORS.border}`,
+      },
+    },
     muiBottomToolbarProps: {
       sx: {
-        bgcolor: COLORS.frost,
+        bgcolor: `color-mix(in srgb, ${COLORS.frost} 70%, transparent)`,
         borderTop: `1px solid ${COLORS.border}`,
         minHeight: `${BOTTOM_BAR_MIN_PX}px`,
         "& > .MuiBox-root": { py: 0.25 },
@@ -964,17 +956,7 @@ export const OffersTable = () => {
     ),
     renderTopToolbarCustomActions: () => (
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexWrap: "wrap", gap: 1 }}>
-        <Badge badgeContent={columnFilters.length} color="primary" overlap="rectangular">
-          <Button
-            size="small"
-            variant={filtersWanted ? "contained" : "outlined"}
-            startIcon={<FilterListRoundedIcon fontSize="small" />}
-            onClick={() => applyShowFilters(!filtersWanted)}
-            sx={{ borderRadius: 999 }}
-          >
-            Filters
-          </Button>
-        </Badge>
+        <FiltersToggle count={columnFilters.length} />
         <FilterTemplateBar
           templates={templates}
           activeId={activeTemplateId}
@@ -985,22 +967,7 @@ export const OffersTable = () => {
           onDelete={handleDelete}
           onClear={handleClear}
         />
-        <TextField
-          size="small"
-          placeholder="Search resort, hotel, country…"
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          sx={{ width: { xs: 190, sm: 260 }, "& .MuiOutlinedInput-root": { borderRadius: 999 } }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchRoundedIcon fontSize="small" sx={{ color: COLORS.inkFaint }} />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
+        <TableSearch />
         <TextField
           select
           size="small"
@@ -1028,6 +995,14 @@ export const OffersTable = () => {
       </Box>
     ),
   });
+
+  useEffect(() => {
+    const paper = table.refs.tablePaperRef;
+    const apply = (open: boolean) =>
+      paper.current?.setAttribute(FILTER_ROW_ATTR, open ? "open" : "closed");
+    apply(useFilterRow.getState().open);
+    return useFilterRow.subscribe((state) => apply(state.open));
+  }, [table]);
 
   return (
     <>

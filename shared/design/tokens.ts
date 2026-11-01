@@ -28,6 +28,14 @@ export interface Palette {
   negativeSoft: string;
   markFlake: string;
   markBars: string;
+  tileHover: string;
+  tooltip: string;
+  cloud: string;
+  cloudLight: string;
+  cloudShade: string;
+  skyTop: string;
+  snow: string;
+  glass: string;
 }
 
 export const LIGHT_COLORS: Palette = {
@@ -58,6 +66,15 @@ export const LIGHT_COLORS: Palette = {
 
   markFlake: "#0D3B66",
   markBars: "#4FC3F7",
+
+  tileHover: "#FFFFFF",
+  tooltip: "#0C2742",
+  cloud: "rgba(255, 255, 255, 0.92)",
+  cloudLight: "rgba(255, 255, 255, 1)",
+  cloudShade: "rgba(118, 146, 178, 0.66)",
+  skyTop: "#D6E7F5",
+  snow: "rgba(104, 146, 186, 0.55)",
+  glass: "rgba(255, 255, 255, 0.6)",
 };
 
 export const DARK_COLORS: Palette = {
@@ -88,6 +105,15 @@ export const DARK_COLORS: Palette = {
 
   markFlake: "#F2F7FB",
   markBars: "#13457A",
+
+  tileHover: "rgba(14, 58, 102, 0.2)",
+  tooltip: "#13457A",
+  cloud: "rgba(132, 164, 196, 0.22)",
+  cloudLight: "rgba(196, 220, 244, 0.22)",
+  cloudShade: "rgba(3, 10, 20, 0.5)",
+  skyTop: "#112842",
+  snow: "rgba(236, 245, 255, 0.8)",
+  glass: "rgba(18, 42, 64, 0.62)",
 };
 
 const varName = (token: keyof Palette): string => {

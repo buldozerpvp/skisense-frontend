@@ -18,7 +18,7 @@ export const NumberRangeFilter = <TData extends MRT_RowData,>({
     column.setFilterValue(next[0] || next[1] ? next : undefined);
 
   return (
-    <Stack direction="row" spacing={0.75} sx={{ pt: 0.5 }}>
+    <Stack direction="row" spacing={0.75} sx={{ pt: 0.5, width: "100%" }}>
       <TextField
         type="number"
         size="small"
@@ -26,7 +26,7 @@ export const NumberRangeFilter = <TData extends MRT_RowData,>({
         value={min}
         onChange={(e) => update([e.target.value, max])}
         slotProps={{ inputLabel: { shrink: true } }}
-        sx={{ minWidth: 74 }}
+        sx={{ flex: 1, minWidth: 86 }}
       />
       <TextField
         type="number"
@@ -35,7 +35,7 @@ export const NumberRangeFilter = <TData extends MRT_RowData,>({
         value={max}
         onChange={(e) => update([min, e.target.value])}
         slotProps={{ inputLabel: { shrink: true } }}
-        sx={{ minWidth: 74 }}
+        sx={{ flex: 1, minWidth: 86 }}
       />
     </Stack>
   );

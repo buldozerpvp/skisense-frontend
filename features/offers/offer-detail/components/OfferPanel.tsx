@@ -366,6 +366,7 @@ const DrawerShell = ({ children, onClose }: { children: React.ReactNode; onClose
       anchor="right"
       open
       onClose={onClose}
+      sx={{ zIndex: (theme) => theme.zIndex.modal }}
       slotProps={{
         paper: {
           sx: {

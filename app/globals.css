@@ -18,6 +18,7 @@
   --color-border: var(--ss-border);
   --color-accent: var(--ss-accent);
   --color-positive: var(--ss-positive);
+  --color-tile-hover: var(--ss-tile-hover);
 }
 
 html,
@@ -113,5 +114,267 @@ a {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+.ss-sky {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  background: linear-gradient(to bottom, var(--ss-sky-top) 0%, transparent 72%);
+}
+
+.ss-cloud {
+  position: absolute;
+  left: 0;
+  width: 1300px;
+  height: 520px;
+  transform-origin: 0 0;
+  will-change: transform;
+  animation: ss-sail var(--duration) linear var(--delay) infinite;
+}
+
+.ss-cloud > span {
+  position: absolute;
+  left: var(--ox);
+  top: var(--oy);
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+}
+
+.ss-cloud__shade {
+  color: var(--ss-cloud-shade);
+  filter: blur(38px);
+}
+
+.ss-cloud__body {
+  color: var(--ss-cloud);
+  background: currentColor;
+  filter: blur(16px);
+}
+
+.ss-cloud__light {
+  color: var(--ss-cloud-light);
+  filter: blur(24px);
+  translate: -26px -22px;
+}
+
+.ss-cloud--cumulus {
+  --ox: 330px;
+  --oy: 200px;
+}
+
+.ss-cloud--cumulus .ss-cloud__body {
+  box-shadow:
+    170px -70px 0 50px,
+    360px -40px 0 30px,
+    540px 10px 0 10px,
+    700px 50px 0 -10px,
+    -170px 40px 0 -5px,
+    -300px 70px 0 -35px,
+    60px -150px 0 0,
+    250px -170px 0 -10px,
+    100px 80px 0 40px,
+    320px 90px 0 45px,
+    520px 90px 0 20px,
+    -80px 90px 0 15px;
+}
+
+.ss-cloud--cumulus .ss-cloud__light {
+  box-shadow:
+    140px -110px 0 10px,
+    20px -175px 0 -30px,
+    330px -85px 0 -10px,
+    -170px 0 0 -35px,
+    520px -25px 0 -30px;
+}
+
+.ss-cloud--cumulus .ss-cloud__shade {
+  box-shadow:
+    100px 140px 0 30px,
+    330px 150px 0 40px,
+    560px 130px 0 10px,
+    -120px 130px 0 0,
+    720px 110px 0 -20px;
+}
+
+.ss-cloud--strato {
+  --ox: 200px;
+  --oy: 220px;
+}
+
+.ss-cloud--strato .ss-cloud__body {
+  box-shadow:
+    160px -30px 0 20px,
+    340px -50px 0 30px,
+    540px -20px 0 10px,
+    740px -40px 0 25px,
+    940px -10px 0 0,
+    1080px 10px 0 -20px,
+    260px 30px 0 20px,
+    640px 30px 0 25px,
+    900px 30px 0 0,
+    -120px 20px 0 -20px;
+}
+
+.ss-cloud--strato .ss-cloud__light {
+  box-shadow:
+    300px -100px 0 -20px,
+    720px -95px 0 -25px,
+    120px -70px 0 -35px,
+    540px -70px 0 -40px;
+}
+
+.ss-cloud--strato .ss-cloud__shade {
+  box-shadow:
+    200px 80px 0 10px,
+    500px 85px 0 20px,
+    820px 80px 0 10px,
+    1000px 60px 0 -20px;
+}
+
+.ss-cloud--far {
+  --s: 0.42;
+  --duration: 320s;
+  --delay: -210s;
+  top: 7vh;
+  opacity: 0.5;
+}
+
+.ss-cloud--high {
+  --s: 0.7;
+  --duration: 250s;
+  --delay: -40s;
+  top: 1vh;
+  opacity: 0.7;
+}
+
+.ss-cloud--hero {
+  --s: 1.25;
+  --duration: 130s;
+  --delay: -38s;
+  top: 22vh;
+}
+
+.ss-cloud--low {
+  --s: 0.85;
+  --duration: 210s;
+  --delay: -150s;
+  top: 66vh;
+  opacity: 0.75;
+}
+
+.ss-snow {
+  position: absolute;
+  left: 0;
+  top: calc(-1 * var(--tile));
+  width: calc(100vw + 2 * var(--tile));
+  height: calc(100vh + var(--tile));
+  background-size: var(--tile) var(--tile);
+  will-change: transform, translate;
+  animation:
+    ss-blow var(--fall) linear infinite,
+    ss-sway var(--sway) ease-in-out infinite alternate;
+}
+
+.ss-snow--far {
+  --tile: 220px;
+  --fall: 30s;
+  --sway: 9s;
+  opacity: 0.45;
+  background-image:
+    radial-gradient(circle at 14px 22px, var(--ss-snow) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 70px 120px, var(--ss-snow) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 132px 46px, var(--ss-snow) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 186px 170px, var(--ss-snow) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 104px 200px, var(--ss-snow) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 38px 150px, var(--ss-snow) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 204px 88px, var(--ss-snow) 0 0.8px, transparent 1.4px);
+}
+
+.ss-snow--mid {
+  --tile: 340px;
+  --fall: 17s;
+  --sway: 6s;
+  opacity: 0.65;
+  background-image:
+    radial-gradient(circle at 46px 70px, var(--ss-snow) 0 1.4px, transparent 2.1px),
+    radial-gradient(circle at 228px 30px, var(--ss-snow) 0 1.2px, transparent 1.9px),
+    radial-gradient(circle at 150px 210px, var(--ss-snow) 0 1.5px, transparent 2.2px),
+    radial-gradient(circle at 300px 280px, var(--ss-snow) 0 1.3px, transparent 2px),
+    radial-gradient(circle at 22px 300px, var(--ss-snow) 0 1.4px, transparent 2.1px);
+}
+
+.ss-snow--near {
+  --tile: 560px;
+  --fall: 9s;
+  --sway: 4s;
+  filter: blur(1px);
+  background-image:
+    radial-gradient(circle at 110px 160px, var(--ss-snow) 0 2.4px, transparent 3.4px),
+    radial-gradient(circle at 400px 60px, var(--ss-snow) 0 2px, transparent 3px),
+    radial-gradient(circle at 300px 440px, var(--ss-snow) 0 2.8px, transparent 3.8px);
+  animation:
+    ss-blow var(--fall) linear infinite,
+    ss-sway var(--sway) ease-in-out infinite alternate,
+    ss-gust 13s ease-in-out infinite alternate;
+}
+
+@keyframes ss-sail {
+  from {
+    transform: translate3d(100vw, 0, 0) scale(var(--s));
+  }
+  to {
+    transform: translate3d(calc(-1300px * var(--s)), 0, 0) scale(var(--s));
+  }
+}
+
+@keyframes ss-blow {
+  to {
+    transform: translate3d(calc(-2 * var(--tile)), var(--tile), 0);
+  }
+}
+
+@keyframes ss-sway {
+  from {
+    translate: -18px 0;
+  }
+  to {
+    translate: 18px 0;
+  }
+}
+
+@keyframes ss-gust {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 0.85;
+  }
+}
+
+@media (max-width: 899.95px) {
+  .ss-sky {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ss-cloud {
+    animation-play-state: paused;
+  }
+
+  .ss-snow {
+    display: none;
+  }
+}
+
+@media print {
+  .ss-sky {
+    display: none;
   }
 }

@@ -111,7 +111,8 @@ export const buildTheme = (mode: ThemeMode) => {
     MuiTooltip: {
       styleOverrides: {
         tooltip: {
-          backgroundColor: COLORS.ink,
+          backgroundColor: COLORS.tooltip,
+          color: "#FFFFFF",
           borderRadius: RADIUS.sm,
           fontSize: 12,
           padding: "6px 10px",

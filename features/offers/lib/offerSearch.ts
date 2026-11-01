@@ -15,9 +15,20 @@ export const searchKey = (text: string): string => {
     .trim();
 };
 
-export const matchesQuery = (query: string, ...fields: (string | undefined)[]): boolean => {
-  const words = searchKey(query).split(" ").filter(Boolean);
-  if (words.length === 0) return true;
-  const haystack = searchKey(fields.filter(Boolean).join(" "));
+export const queryWords = (query: string): string[] => {
+  return searchKey(query).split(" ").filter(Boolean);
+};
+
+export const searchHaystack = (...fields: (string | undefined)[]): string => {
+  return searchKey(fields.filter(Boolean).join(" "));
+};
+
+export const matchesWords = (words: string[], haystack: string): boolean => {
   return words.every((word) => haystack.includes(word));
+};
+
+export const matchesQuery = (query: string, ...fields: (string | undefined)[]): boolean => {
+  const words = queryWords(query);
+  if (words.length === 0) return true;
+  return matchesWords(words, searchHaystack(...fields));
 };

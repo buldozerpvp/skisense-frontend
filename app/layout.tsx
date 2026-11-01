@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/app/providers";
 import { TopBar } from "@/features/app-shell/components/TopBar";
 import { SiteFooter } from "@/features/app-shell/components/SiteFooter";
+import { SkyBackdrop } from "@/features/app-shell/components/SkyBackdrop";
 import { APP_NAME, APP_TAGLINE } from "@/features/app-shell/constants";
 import { FONT_STYLESHEET_HREF, themeVariablesCss } from "@/shared/design/tokens";
 import { THEME_INIT_SCRIPT } from "@/features/app-shell/hooks/useThemeMode";
@@ -26,7 +27,8 @@ const RootLayout = ({ children }: LayoutProps<"/">) => {
       </head>
       <body>
         <Providers>
-                    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
+          <SkyBackdrop />
+          <Box sx={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", minHeight: "100dvh" }}>
             <TopBar />
             <Box component="main" sx={{ flex: 1 }}>
               {children}

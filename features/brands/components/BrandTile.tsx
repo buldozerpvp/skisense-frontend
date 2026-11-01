@@ -23,7 +23,7 @@ export const BrandTile = ({ brand, index = 0 }: BrandWidgetProps) => {
     >
       <Link
         href={`/brands/${brand.slug}`}
-        className="group flex w-28 flex-col items-center gap-2 rounded-2xl p-3 transition-all duration-200 hover:-translate-y-1 hover:bg-white hover:shadow-[0_12px_30px_-18px_rgba(12,39,66,0.5)] sm:w-32"
+        className="group flex w-28 flex-col items-center gap-2 rounded-2xl p-3 transition-all duration-200 hover:-translate-y-1 hover:bg-tile-hover hover:shadow-[0_12px_30px_-18px_rgba(12,39,66,0.5)] sm:w-32"
       >
         <div
           className={`relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-white transition-all duration-200 sm:h-24 sm:w-24 ${ringClass}`}
