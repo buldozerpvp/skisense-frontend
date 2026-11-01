@@ -16,10 +16,6 @@ import {
   Box,
   Chip,
   Typography,
-  Avatar,
-  IconButton,
-  Tooltip,
-  Link as MuiLink,
   MenuItem,
   TextField,
   Stack,
@@ -28,6 +24,7 @@ import {
 } from "@mui/material";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import { COLORS } from "@/shared/design/tokens";
+import styles from "@/features/offers/components/OffersTable.module.css";
 import {
   fitsParty,
   paxOf,
@@ -47,7 +44,7 @@ import {
   hotelLabels,
   propertyTypeOf,
 } from "@/features/offers/lib/hotelLabels";
-import { MultiSelectFilter, isOneOf } from "@/features/offers/filtering/components/MultiSelectFilter";
+import { MemoMultiSelectFilter, isOneOf } from "@/features/offers/filtering/components/MultiSelectFilter";
 import { pct as formatPct, shortDate } from "@/shared/format/formatters";
 import { buildSeriesIndex, offerKey } from "@/features/analytics/lib/deriveSeries";
 import { useChartColors, changeColor } from "@/shared/charts/lib/palette";
@@ -56,6 +53,8 @@ import {
   COLUMN_ORDER,
   COLUMN_WIDTH,
   BOTTOM_BAR_MIN_PX,
+  ROW_HEIGHT_PX,
+  ROW_OVERSCAN,
   GLASS_BLUR,
   FILTER_ROW_ATTR,
   PAGE_SIZE,
@@ -68,18 +67,19 @@ import {
 } from "@/features/offers/constants";
 import { matchesWords, queryWords, searchHaystack } from "@/features/offers/lib/offerSearch";
 import { useAllOffers, useLatestOffers } from "@/features/prices/hooks/usePrices";
-import { buildOffers, type Offer } from "@/features/offers/lib/offerModel";
-import { OfferPanel } from "@/features/offers/offer-detail/components/OfferPanel";
+import { TableOfferPanel } from "@/features/offers/components/TableOfferPanel";
+import { useOpenOffer } from "@/features/offers/hooks/useOpenOffer";
 import { FiltersToggle } from "@/features/offers/components/FiltersToggle";
 import { TableSearch } from "@/features/offers/components/TableSearch";
 import { useFilterRow } from "@/features/offers/hooks/useFilterRow";
 import { filterRowPaperSx } from "@/features/offers/lib/filterRowSx";
+import { tableBodySx } from "@/features/offers/lib/tableBodySx";
 import { useOffersBrowsing } from "@/features/offers/hooks/useOffersBrowsing";
 import { BRANDS, getBrand } from "@/features/brands/constants";
 import type { OfferStatus, PriceRow, PropertyType } from "@/features/prices/lib/priceTypes";
-import { DateRangeFilter, isWithinDateRange, type DateRangeValue } from "@/features/offers/filtering/components/DateRangeFilter";
+import { MemoDateRangeFilter, isWithinDateRange, type DateRangeValue } from "@/features/offers/filtering/components/DateRangeFilter";
 import {
-  NumberRangeFilter,
+  MemoNumberRangeFilter,
   isWithinNumberRange,
   type NumberRangeValue,
 } from "@/features/offers/filtering/components/NumberRangeFilter";
@@ -118,6 +118,16 @@ const addDays = (date: string, days: number): string => {
 const resolveNights = (row: BrandedPriceRow): number | undefined => {
   return row.nights ?? getBrand(row.brandSlug)?.defaultNights;
 };
+
+const BRAND_OPTIONS = BRANDS.map((b) => ({ label: b.name, value: b.slug }));
+const BOARD_OPTIONS = BOARD_ORDER.map((board) => ({ label: BOARD_LABEL[board], value: board }));
+const FLIGHT_OPTIONS = (["included", "land-only", "unknown"] as FlightStatus[]).map((state) => ({
+  label: FLIGHT_FILTER_LABEL[state],
+  value: state,
+}));
+const STATUS_OPTIONS = Object.entries(STATUS_LABEL).map(([value, { label }]) => ({ label, value }));
+
+const WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: "UTC" });
 
 const priceBlockSx = (columnId: string, surface: "head" | "body") => {
   if (!PRICE_COLUMNS.includes(columnId)) return {};
@@ -159,9 +169,12 @@ export const OffersTable = () => {
   const { data, isLoading } = useLatestOffers();
   const history = useAllOffers();
   const chartColors = useChartColors();
-  const [openOfferKey, setOpenOfferKey] = useState<string | null>(null);
   const selectedBrands = useOffersBrowsing((s) => s.selectedBrands);
-  const searchText = useOffersBrowsing((s) => s.searchText);
+  const [searchText, setSearchText] = useState(() => useOffersBrowsing.getState().searchText);
+  const onSearch = useCallback((text: string) => {
+    useOffersBrowsing.getState().setSearchText(text);
+    setSearchText(text);
+  }, []);
 
   const [columnFilters, setColumnFilters] = useState<MRT_ColumnFiltersState>(DEFAULT_FILTERS);
   const [sorting, setSorting] = useState<MRT_SortingState>(DEFAULT_SORTING);
@@ -175,20 +188,21 @@ export const OffersTable = () => {
     return selectedBrands.length > 0 ? all.filter((r) => selectedBrands.includes(r.brandSlug)) : all;
   }, [data, selectedBrands]);
 
-  const haystacks = useMemo(
-    () =>
-      brandRows.map((r) => {
-        const badge = countryBadge(r.country);
-        return searchHaystack(r.resort, r.hotel, r.board, r.country, badge.name, badge.code);
-      }),
-    [brandRows]
-  );
+  const haystacks = useMemo(() => {
+    const byRow = new WeakMap<BrandedPriceRow, string>();
+    for (const r of brandRows) {
+      const badge = countryBadge(r.country);
+      byRow.set(r, searchHaystack(r.resort, r.hotel, r.board, r.country, badge.name, badge.code));
+    }
+    return byRow;
+  }, [brandRows]);
+
+  const searchWords = useMemo(() => queryWords(searchText), [searchText]);
 
   const matchingRows = useMemo<BrandedPriceRow[]>(() => {
-    const words = queryWords(searchText);
-    if (words.length === 0) return brandRows;
-    return brandRows.filter((_, i) => matchesWords(words, haystacks[i]));
-  }, [brandRows, haystacks, searchText]);
+    if (searchWords.length === 0) return brandRows;
+    return brandRows.filter((r) => matchesWords(searchWords, haystacks.get(r) ?? ""));
+  }, [brandRows, haystacks, searchWords]);
 
   const partyCounts = useMemo(() => {
     const counts = new Map<number, number>();
@@ -199,12 +213,8 @@ export const OffersTable = () => {
     return counts;
   }, [matchingRows]);
 
-  const rows = useMemo(
-    () => matchingRows.filter((row) => fitsParty(row, party)),
-    [matchingRows, party]
-  );
+  const rows = useMemo(() => matchingRows.filter((row) => fitsParty(row, party)), [matchingRows, party]);
 
-  const detailOffers = useMemo(() => buildOffers(data, history.data), [data, history.data]);
 
   const watchedByKey = useMemo(() => {
     if (!history.data) return new Map<string, { points: SparklinePoint[]; movePct: number | null }>();
@@ -227,15 +237,19 @@ export const OffersTable = () => {
       watchedByKey.get(offerKey(row.brandSlug, row.resortId, row.date, row.nights)) ?? null,
     [watchedByKey]
   );
-  const openOffer = useMemo(
-    () => detailOffers.find((offer) => offer.key === openOfferKey) ?? null,
-    [detailOffers, openOfferKey]
-  );
 
   const resortOptions = useMemo(() => toOptions(brandRows.map((r) => r.resort)), [brandRows]);
   const countryOptions = useMemo(
     () => toOptions(brandRows.map((r) => r.country)),
     [brandRows]
+  );
+  const countryFilterOptions = useMemo(
+    () =>
+      countryOptions.map((o) => {
+        const badge = countryBadge(o.value);
+        return { ...o, label: `${badge.flag} ${badge.name}`.trim() };
+      }),
+    [countryOptions]
   );
   const labels = useMemo(() => hotelLabels(brandRows), [brandRows]);
   const hotelOptions = useMemo(
@@ -325,134 +339,86 @@ export const OffersTable = () => {
         Cell: ({ cell }) => {
           const brand = getBrand(cell.getValue<string>());
           return (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-              <Avatar
-                src={brand?.logoSrc}
-                sx={{ bgcolor: brand?.color, width: 28, height: 28, fontSize: 11 }}
-              >
-                {brand?.initials}
-              </Avatar>
-              <Typography variant="body2">{brand?.name ?? cell.getValue<string>()}</Typography>
-            </Box>
+            <span className={styles.brand}>
+              {brand?.logoSrc ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={brand.logoSrc} alt="" className={styles.brandLogo} loading="lazy" decoding="async" />
+              ) : (
+                <span className={styles.brandLogo} style={{ background: brand?.color }}>
+                  {brand?.initials}
+                </span>
+              )}
+              <span>{brand?.name ?? cell.getValue<string>()}</span>
+            </span>
           );
         },
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
         Filter: ({ column }) => (
-          <MultiSelectFilter
-            column={column}
-            options={BRANDS.map((b) => ({ label: b.name, value: b.slug }))}
-          />
+          <MemoMultiSelectFilter column={column} value={column.getFilterValue()} options={BRAND_OPTIONS} />
         ),
       },
       {
         accessorKey: "resort",
         header: "Resort",
+        sortingFn: "text",
         size: COLUMN_WIDTH["resort"],
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
-        Filter: ({ column }) => <MultiSelectFilter column={column} options={resortOptions} />,
+        Filter: ({ column }) => <MemoMultiSelectFilter column={column} value={column.getFilterValue()} options={resortOptions} />,
         Cell: ({ row }) => {
           const badge = countryBadge(row.original.country);
           return (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
-              <Box
-                component="button"
+            <span className={styles.resort}>
+              <button
                 type="button"
-                onClick={(event: React.MouseEvent) => {
+                className={`${styles.resortButton} ${styles.oneLine}`}
+                onClick={(event) => {
                   event.stopPropagation();
                   useResortCard.getState().open(row.original.resortKey, row.original.resort);
                 }}
-                sx={{
-                  minWidth: 0,
-                  p: 0,
-                  border: "none",
-                  bgcolor: "transparent",
-                  color: "inherit",
-                  font: "inherit",
-                  textAlign: "left",
-                  cursor: "pointer",
-                  textDecoration: "underline",
-                  textDecorationColor: "transparent",
-                  textUnderlineOffset: 3,
-                  "&:hover": { textDecorationColor: COLORS.brand },
-                }}
               >
                 {row.original.resort}
-              </Box>
-              <Tooltip title={badge.name}>
-                <Box
-                  component="span"
-                  aria-label={badge.name}
-                  sx={{
-                    flexShrink: 0,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 0.25,
-                    px: 0.6,
-                    py: 0.1,
-                    borderRadius: 1,
-                    bgcolor: COLORS.frost,
-                    border: `1px solid ${COLORS.border}`,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    letterSpacing: "0.03em",
-                    color: "text.secondary",
-                  }}
-                >
-                  <span aria-hidden>{badge.flag}</span>
-                  {badge.code}
-                </Box>
-              </Tooltip>
-            </Box>
+              </button>
+              <span className={styles.countryBadge} title={badge.name} aria-label={badge.name}>
+                <span aria-hidden>{badge.flag}</span>
+                {badge.code}
+              </span>
+            </span>
           );
         },
       },
       {
         id: "hotel",
         header: "Hotel",
+        sortingFn: "text",
         size: COLUMN_WIDTH["hotel"],
         accessorFn: (row) => hotelLabelOf(row, labels) ?? "",
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
-        Filter: ({ column }) => <MultiSelectFilter column={column} options={hotelOptions} />,
+        Filter: ({ column }) => <MemoMultiSelectFilter column={column} value={column.getFilterValue()} options={hotelOptions} />,
         Cell: ({ row }) => {
           const { url, board } = row.original;
           const label = hotelLabelOf(row.original, labels) ?? "—";
           return (
-            <Box>
+            <span className={styles.stack}>
               {url ? (
-                <MuiLink
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  underline="hover"
-                  sx={{ color: "text.primary", fontWeight: 500 }}
-                >
+                <a href={url} target="_blank" rel="noopener noreferrer" className={`${styles.hotelLink} ${styles.oneLine}`} title={label}>
                   {label}
-                </MuiLink>
+                </a>
               ) : (
-                label
+                <span className={styles.oneLine} title={label}>{label}</span>
               )}
-              {board && (
-                <Typography variant="caption" color="text.secondary" display="block">
-                  {board}
-                </Typography>
-              )}
-            </Box>
+              {board && <span className={`${styles.caption} ${styles.oneLine}`}>{board}</span>}
+            </span>
           );
         },
       },
       {
         accessorKey: "country",
         header: "Country",
+        sortingFn: "text",
         size: COLUMN_WIDTH["country"],
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
         Filter: ({ column }) => (
-          <MultiSelectFilter
-            column={column}
-            options={countryOptions.map((o) => {
-              const badge = countryBadge(o.value);
-              return { ...o, label: `${badge.flag} ${badge.name}`.trim() };
-            })}
-          />
+          <MemoMultiSelectFilter column={column} value={column.getFilterValue()} options={countryFilterOptions} />
         ),
         Cell: ({ cell }) => {
           const badge = countryBadge(cell.getValue<string>());
@@ -463,24 +429,23 @@ export const OffersTable = () => {
         accessorKey: "date",
         header: "Dates",
         size: COLUMN_WIDTH["dates"],
+        sortingFn: "basic",
         Cell: ({ row }) => {
           const { date } = row.original;
           const nights = resolveNights(row.original);
           return (
-            <Box>
-              <Box className="tabular" sx={{ fontWeight: 600 }}>
+            <span>
+              <span className={`tabular ${styles.w600}`}>
                 {shortDate(date)}
                 {nights ? ` → ${shortDate(addDays(date, nights))}` : ""}
-              </Box>
-              <Typography variant="caption" color="text.secondary">
-                {new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" })}
-              </Typography>
-            </Box>
+              </span>
+              <span className={styles.caption}>{WEEKDAY.format(new Date(`${date}T00:00:00Z`))}</span>
+            </span>
           );
         },
         filterFn: (row, id, value) =>
           isWithinDateRange(row.getValue<string>(id), value as DateRangeValue | undefined),
-        Filter: ({ column }) => <DateRangeFilter column={column} />,
+        Filter: ({ column }) => <MemoDateRangeFilter column={column} value={column.getFilterValue()} />,
       },
       {
         id: "nights",
@@ -493,7 +458,7 @@ export const OffersTable = () => {
         },
         sortingFn: "basic",
         filterFn: (row, id, value) => isOneOf(String(row.getValue<number>(id)), value),
-        Filter: ({ column }) => <MultiSelectFilter column={column} options={nightsOptions} />,
+        Filter: ({ column }) => <MemoMultiSelectFilter column={column} value={column.getFilterValue()} options={nightsOptions} />,
       },
       {
         id: "propertyType",
@@ -503,14 +468,14 @@ export const OffersTable = () => {
         Cell: ({ row }) => {
           const type = propertyTypeOf(row.original);
           return (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <span className={styles.inline}>
               <span aria-hidden>{PROPERTY_TYPE_ICON[type]}</span>
               {PROPERTY_TYPE_LABEL[type]}
-            </Box>
+            </span>
           );
         },
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
-        Filter: ({ column }) => <MultiSelectFilter column={column} options={typeOptions} />,
+        Filter: ({ column }) => <MemoMultiSelectFilter column={column} value={column.getFilterValue()} options={typeOptions} />,
       },
       {
         id: "pax",
@@ -521,16 +486,14 @@ export const OffersTable = () => {
         Cell: ({ row }) => {
           const pax = paxOf(row.original);
           return (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            <span className={styles.inline}>
               <span aria-hidden>{pax === 1 ? "🧍" : "👥"}</span>
-              <Box component="span" className="tabular">
-                {pax}
-              </Box>
-            </Box>
+              <span className="tabular">{pax}</span>
+            </span>
           );
         },
         filterFn: (row, id, value) => isOneOf(String(row.getValue<number>(id)), value),
-        Filter: ({ column }) => <MultiSelectFilter column={column} options={paxOptions} />,
+        Filter: ({ column }) => <MemoMultiSelectFilter column={column} value={column.getFilterValue()} options={paxOptions} />,
       },
       {
         id: "total",
@@ -539,18 +502,14 @@ export const OffersTable = () => {
         accessorFn: (row) => totalPrice(row),
         sortingFn: "basic",
         Cell: ({ row }) => (
-          <Box>
-            <Box className="tabular" sx={{ fontWeight: 700 }}>
-              €{totalPrice(row.original).toLocaleString()}
-            </Box>
-            <Typography variant="caption" color="text.secondary">
-              for {paxOf(row.original)}
-            </Typography>
-          </Box>
+          <span>
+            <span className={`tabular ${styles.w700}`}>€{totalPrice(row.original).toLocaleString()}</span>
+            <span className={styles.caption}>for {paxOf(row.original)}</span>
+          </span>
         ),
         filterFn: (row, id, value) =>
           isWithinNumberRange(row.getValue<number>(id), value as NumberRangeValue | undefined),
-        Filter: ({ column }) => <NumberRangeFilter column={column} prefix="€" />,
+        Filter: ({ column }) => <MemoNumberRangeFilter column={column} value={column.getFilterValue()} prefix="€" />,
       },
       {
         id: "perPerson",
@@ -560,16 +519,10 @@ export const OffersTable = () => {
         sortingFn: "basic",
         enableColumnFilter: false,
         Cell: ({ row }) => (
-          <Box className="tabular" sx={{ fontWeight: 600 }}>
-            €
-            {pricePerPerson(
-              row.original,
-              party === "any" ? paxOf(row.original) : party
-            ).toLocaleString()}
-            <Typography variant="caption" color="text.secondary" sx={{ display: "block" }}>
-              each
-            </Typography>
-          </Box>
+          <span className={`tabular ${styles.w600}`}>
+            €{pricePerPerson(row.original, party === "any" ? paxOf(row.original) : party).toLocaleString()}
+            <span className={styles.caption}>each</span>
+          </span>
         ),
       },
       {
@@ -586,39 +539,28 @@ export const OffersTable = () => {
           return left - right;
         },
         Cell: ({ row }) => {
-          if (history.isLoading) {
-            return (
-              <Typography variant="caption" color="text.disabled">
-                …
-              </Typography>
-            );
-          }
+          if (history.isLoading) return <span className={`${styles.small} ${styles.faint}`}>…</span>;
           const watched = watchedFor(row.original);
           const move = watched?.movePct ?? null;
           const settled = move !== null && Math.abs(move) < UNCHANGED_PCT;
+          const quiet = move === null || settled;
           return (
-            <Tooltip
+            <span
+              className={styles.change}
               title={
                 watched
                   ? `${watched.points.length} ${watched.points.length === 1 ? "night" : "nights"} watched`
                   : "Not seen on an earlier night yet."
               }
             >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                <PriceSparkline points={watched?.points ?? []} movePct={move} />
-                <Box
-                  className="tabular"
-                  sx={{
-                    fontSize: 12.5,
-                    fontWeight: settled ? 400 : 600,
-                    color:
-                      move === null || settled ? COLORS.inkFaint : changeColor(move, chartColors),
-                  }}
-                >
-                  {move === null ? "—" : settled ? "0%" : formatPct(move)}
-                </Box>
-              </Box>
-            </Tooltip>
+              <PriceSparkline points={watched?.points ?? []} movePct={move} />
+              <span
+                className={`tabular ${styles.small} ${quiet ? styles.faint : styles.w600}`}
+                style={quiet ? undefined : { color: changeColor(move, chartColors) }}
+              >
+                {move === null ? "—" : settled ? "0%" : formatPct(move)}
+              </span>
+            </span>
           );
         },
       },
@@ -630,25 +572,19 @@ export const OffersTable = () => {
         enableColumnFilter: false,
         Cell: ({ row }) => {
           const { url, resort, hotel } = row.original;
-          if (!url) {
-            return (
-              <Typography variant="caption" color="text.disabled">
-                —
-              </Typography>
-            );
-          }
+          if (!url) return <span className={`${styles.small} ${styles.faint}`}>—</span>;
           return (
-            <Tooltip title="Open this offer on the operator's site">
-              <IconButton
-                size="small"
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`Open ${hotel ?? resort} on the operator's site`}
-              >
-                <OpenInNewRoundedIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.openLink}
+              title="Open this offer on the operator's site"
+              aria-label={`Open ${hotel ?? resort} on the operator's site`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <OpenInNewRoundedIcon fontSize="small" />
+            </a>
           );
         },
       },
@@ -659,19 +595,17 @@ export const OffersTable = () => {
         accessorFn: (row) => boardFor(row.brandSlug, row.board),
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
         Filter: ({ column }) => (
-          <MultiSelectFilter
-            column={column}
-            options={BOARD_ORDER.map((board) => ({ label: BOARD_LABEL[board], value: board }))}
-          />
+          <MemoMultiSelectFilter column={column} value={column.getFilterValue()} options={BOARD_OPTIONS} />
         ),
         Cell: ({ row }) => {
           const board = boardFor(row.original.brandSlug, row.original.board) as BoardBasis;
           return (
-            <Tooltip title={row.original.board ?? "The operator does not state the board on this offer."}>
-              <Box component="span" sx={{ fontSize: 12.5, color: board === "unknown" ? COLORS.inkFaint : COLORS.ink }}>
-                {BOARD_ICON[board]} {BOARD_LABEL[board]}
-              </Box>
-            </Tooltip>
+            <span
+              className={`${styles.small} ${board === "unknown" ? styles.faint : ""}`}
+              title={row.original.board ?? "The operator does not state the board on this offer."}
+            >
+              {BOARD_ICON[board]} {BOARD_LABEL[board]}
+            </span>
           );
         },
       },
@@ -682,13 +616,7 @@ export const OffersTable = () => {
         accessorFn: (row) => flightStatus(row.brandSlug, row.flights),
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
         Filter: ({ column }) => (
-          <MultiSelectFilter
-            column={column}
-            options={(["included", "land-only", "unknown"] as FlightStatus[]).map((state) => ({
-              label: FLIGHT_FILTER_LABEL[state],
-              value: state,
-            }))}
-          />
+          <MemoMultiSelectFilter column={column} value={column.getFilterValue()} options={FLIGHT_OPTIONS} />
         ),
         Cell: ({ row }) => {
           const state = flightStatus(row.original.brandSlug, row.original.flights);
@@ -696,11 +624,13 @@ export const OffersTable = () => {
           const colour =
             state === "included" ? COLORS.positive : state === "land-only" ? COLORS.inkMuted : COLORS.accent;
           return (
-            <Tooltip title={detail?.note ?? "We have not established what this price includes."}>
-              <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.5, color: colour, fontSize: 12.5 }}>
-                {state === "included" ? "✈" : state === "land-only" ? "🏨" : "?"} {FLIGHT_FILTER_LABEL[state]}
-              </Box>
-            </Tooltip>
+            <span
+              className={`${styles.inline} ${styles.small}`}
+              style={{ color: colour }}
+              title={detail?.note ?? "We have not established what this price includes."}
+            >
+              {state === "included" ? "✈" : state === "land-only" ? "🏨" : "?"} {FLIGHT_FILTER_LABEL[state]}
+            </span>
           );
         },
       },
@@ -710,10 +640,7 @@ export const OffersTable = () => {
         size: COLUMN_WIDTH["status"],
         filterFn: (row, id, value) => isOneOf(row.getValue<string>(id), value),
         Filter: ({ column }) => (
-          <MultiSelectFilter
-            column={column}
-            options={Object.entries(STATUS_LABEL).map(([value, { label }]) => ({ label, value }))}
-          />
+          <MemoMultiSelectFilter column={column} value={column.getFilterValue()} options={STATUS_OPTIONS} />
         ),
         Cell: ({ cell }) => {
           const { label, color } = STATUS_LABEL[cell.getValue<OfferStatus>()];
@@ -723,7 +650,7 @@ export const OffersTable = () => {
     ],
     [
       resortOptions,
-      countryOptions,
+      countryFilterOptions,
       nightsOptions,
       hotelOptions,
       paxOptions,
@@ -752,11 +679,6 @@ export const OffersTable = () => {
   }, [onBrandPage]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Two ways through a long result set. Scrolling is the default because the
-  // question is almost always "what else is there" rather than "what is on
-  // page four"; paging stays because a fixed page is the only way to hold a
-  // place while comparing. Both run off the same client-side row model — the
-  // scroll mode simply grows the page until the rows run out.
   const [rowMode, setRowMode] = useState<"scroll" | "pages">("scroll");
   const [pagination, setPagination] = useState<MRT_PaginationState>({
     pageIndex: 0,
@@ -778,9 +700,6 @@ export const OffersTable = () => {
     scrollRef.current?.scrollTo({ top: 0 });
   }, [rowMode, columnFilters, sorting, searchText, party]);
 
-  // rows.length is the unfiltered total, so it only ever over-estimates what
-  // is left: the guard stops the page growing forever, and the row model
-  // still decides how many of those rows a filter lets through.
   const handleScroll = useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
       if (rowMode !== "scroll") return;
@@ -798,7 +717,14 @@ export const OffersTable = () => {
   const table = useMaterialReactTable({
     columns,
     data: rows,
-    state: { isLoading, columnFilters, sorting, columnVisibility, showColumnFilters: true, pagination },
+    state: {
+      isLoading,
+      columnFilters,
+      sorting,
+      columnVisibility,
+      showColumnFilters: true,
+      pagination,
+    },
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onShowColumnFiltersChange: (updater: boolean | ((prev: boolean) => boolean)) => {
@@ -810,9 +736,16 @@ export const OffersTable = () => {
     enableBottomToolbar: true,
     enableGrouping: true,
     enableColumnActions: false,
-    enableGlobalFilter: false, 
+    enableGlobalFilter: false,
+    autoResetPageIndex: false,
     enableColumnFilters: true,
     enableStickyHeader: true,
+    enableRowVirtualization: true,
+    rowVirtualizerOptions: {
+      overscan: ROW_OVERSCAN,
+      estimateSize: () => ROW_HEIGHT_PX,
+      measureElement: () => ROW_HEIGHT_PX,
+    },
     enableDensityToggle: false,
     enableColumnPinning: true,
     renderToolbarInternalActions: ({ table: instance }) => (
@@ -833,6 +766,7 @@ export const OffersTable = () => {
     muiTablePaperProps: {
       sx: {
         ...filterRowPaperSx,
+        ...tableBodySx,
         position: "relative",
         isolation: "isolate",
         bgcolor: "transparent",
@@ -885,18 +819,11 @@ export const OffersTable = () => {
         },
       };
     },
-    muiTableBodyCellProps: ({ column }) => ({
-      sx: {
-        fontSize: 13.5,
-        px: 1.25,
-        ...priceBlockSx(column.id, "body"),
-        ...pinnedSx(column.id, "body"),
-      },
-    }),
+    muiTableBodyCellProps: ({ column }) => ({ className: `ss-col-${column.id}` }),
     muiTableBodyRowProps: ({ row }) => {
       const offer = row.original as BrandedPriceRow | undefined;
       if (!offer?.resortId) return {};
-      const open = () => setOpenOfferKey(offerDetailKey(offer));
+      const open = () => useOpenOffer.getState().open(offerDetailKey(offer));
       return {
         onClick: open,
         onKeyDown: (event: React.KeyboardEvent) => {
@@ -908,12 +835,6 @@ export const OffersTable = () => {
         tabIndex: 0,
         role: "button",
         "aria-label": `Open ${offer.hotel ?? offer.resort}, departing ${offer.date}`,
-        sx: {
-          cursor: "pointer",
-          bgcolor: "transparent",
-          "&:hover": { bgcolor: `color-mix(in srgb, ${COLORS.frost} 75%, transparent)` },
-          "&:focus-visible": { outline: `2px solid ${COLORS.brand}`, outlineOffset: "-2px" },
-        },
       };
     },
     muiFilterTextFieldProps: { placeholder: "Filter" },
@@ -967,7 +888,7 @@ export const OffersTable = () => {
           onDelete={handleDelete}
           onClear={handleClear}
         />
-        <TableSearch />
+        <TableSearch initial={searchText} onSearch={onSearch} />
         <TextField
           select
           size="small"
@@ -1007,13 +928,7 @@ export const OffersTable = () => {
   return (
     <>
       <MaterialReactTable table={table} />
-      <OfferPanel
-        offer={openOffer}
-        siblings={detailOffers}
-        surface="drawer"
-        onClose={() => setOpenOfferKey(null)}
-        onPick={(offer: Offer) => setOpenOfferKey(offer.key)}
-      />
+      <TableOfferPanel />
     </>
   );
 };

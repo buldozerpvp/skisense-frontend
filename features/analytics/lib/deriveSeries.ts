@@ -18,7 +18,7 @@ export const offerKey = (source: string, resortId: string, departure: string, ni
   return `${source}|${resortId}|${departure}|${nights ?? "?"}`;
 };
 
-export const buildSeriesIndex = (history: SourceOfferHistory[] | undefined): SeriesIndex => {
+const computeSeriesIndex = (history: SourceOfferHistory[] | undefined): SeriesIndex => {
   const byKey = new Map<OfferKey, OfferSeries>();
   const coverage = new Map<DayISO, number>();
   const daySet = new Set<DayISO>();
@@ -72,6 +72,17 @@ export const buildSeriesIndex = (history: SourceOfferHistory[] | undefined): Ser
   }
 
   return { days, coverage, byKey, latestDay };
+};
+
+const SERIES_BY_HISTORY = new WeakMap<SourceOfferHistory[], SeriesIndex>();
+
+export const buildSeriesIndex = (history: SourceOfferHistory[] | undefined): SeriesIndex => {
+  if (!history) return computeSeriesIndex(undefined);
+  const cached = SERIES_BY_HISTORY.get(history);
+  if (cached) return cached;
+  const built = computeSeriesIndex(history);
+  SERIES_BY_HISTORY.set(history, built);
+  return built;
 };
 
 export const computeMovements = (index: SeriesIndex): Movement[] => {

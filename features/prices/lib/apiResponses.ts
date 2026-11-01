@@ -7,12 +7,16 @@ const PRICE_CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=300, stale-while-revalidate=86400",
 } as const;
 
-export const serveOrProxy = async <T>(fromDatabase: () => Promise<T>, backendPath: string): Promise<NextResponse> => {
+export const serveOrProxy = async <T>(
+  fromDatabase: () => Promise<T>,
+  backendPath: string,
+  shape: (value: T) => unknown = (value) => value
+): Promise<NextResponse> => {
   if (!isDbConfigured()) {
     try {
       const res = await fetch(`${LOCAL_BACKEND}${backendPath}`, { cache: "no-store" });
       if (!res.ok) throw new Error(`backend responded ${res.status}`);
-      return NextResponse.json(await res.json());
+      return NextResponse.json(shape((await res.json()) as T));
     } catch (e) {
       return NextResponse.json(
         {
@@ -26,7 +30,7 @@ export const serveOrProxy = async <T>(fromDatabase: () => Promise<T>, backendPat
   }
 
   try {
-    return NextResponse.json(await fromDatabase(), { headers: PRICE_CACHE_HEADERS });
+    return NextResponse.json(shape(await fromDatabase()), { headers: PRICE_CACHE_HEADERS });
   } catch (e) {
     return NextResponse.json({ error: "Database query failed", detail: String(e) }, { status: 502 });
   }

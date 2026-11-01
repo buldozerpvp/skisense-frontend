@@ -4,7 +4,7 @@ import { buildHomeModel } from "@/features/analytics/lib/homeModel";
 import { countryBadge } from "@/features/offers/lib/countryBadge";
 import { hotelLabelOf, hotelLabels, propertyTypeOf } from "@/features/offers/lib/hotelLabels";
 import { paxOf, totalPrice, type PartyChoice } from "@/features/offers/lib/pricing";
-import { matchesQuery } from "@/features/offers/lib/offerSearch";
+import { matchesWords, queryWords, searchHaystack } from "@/features/offers/lib/offerSearch";
 import { flightStatus, type FlightStatus, type StatedInclusions } from "@/features/offers/inclusions/lib/packageInclusions";
 import { boardFor, type BoardBasis } from "@/features/offers/inclusions/lib/board";
 import { DEFAULT_FILTERS, FILTERS_COUNTED_AS_ACTIVE } from "@/features/offers/constants";
@@ -37,13 +37,14 @@ export interface Offer {
   board: BoardBasis;
   boardRaw?: string;
   stated: StatedInclusions;
+  haystack: string;
 }
 
 const changeKey = (source: string, row: PriceRow): string => {
   return [source, row.resortId, row.hotel ?? "", row.date, row.nights ?? "?"].join("|");
 };
 
-export const buildOffers = (latest: SourceOffers[] | undefined, history: SourceOfferHistory[] | undefined): Offer[] => {
+const computeOffers = (latest: SourceOffers[] | undefined, history: SourceOfferHistory[] | undefined): Offer[] => {
   if (!latest) return [];
 
   const everyRow = latest.flatMap((entry) => entry.data);
@@ -102,10 +103,26 @@ export const buildOffers = (latest: SourceOffers[] | undefined, history: SourceO
           ...(row.liftPassDays !== undefined ? { liftPassDays: row.liftPassDays } : {}),
           ...(row.liftPass !== undefined ? { liftPass: row.liftPass } : {}),
         },
+        haystack: searchHaystack(row.resort, hotel, brand?.name ?? entry.source, badge.name),
       });
     }
   }
   return offers;
+};
+
+const NO_HISTORY = {};
+const OFFERS_BY_LATEST = new WeakMap<SourceOffers[], WeakMap<object, Offer[]>>();
+
+export const buildOffers = (latest: SourceOffers[] | undefined, history: SourceOfferHistory[] | undefined): Offer[] => {
+  if (!latest) return [];
+  const byHistory = OFFERS_BY_LATEST.get(latest) ?? new WeakMap<object, Offer[]>();
+  OFFERS_BY_LATEST.set(latest, byHistory);
+  const key = history ?? NO_HISTORY;
+  const cached = byHistory.get(key);
+  if (cached) return cached;
+  const built = computeOffers(latest, history);
+  byHistory.set(key, built);
+  return built;
 };
 
 export type OfferSort = "cheapest" | "dearest" | "drop" | "soonest";
@@ -159,6 +176,7 @@ export const stayRange = (iso: string, nights: number | undefined): string => {
 };
 
 export const filterOffers = (offers: Offer[], filters: OfferFilters): Offer[] => {
+  const words = queryWords(filters.query);
   const kept = offers.filter((offer) => {
     if (filters.types.length > 0 && !filters.types.includes(offer.propertyType)) return false;
     if (filters.resorts && !filters.resorts.includes(offer.resortKey)) return false;
@@ -176,8 +194,7 @@ export const filterOffers = (offers: Offer[], filters: OfferFilters): Offer[] =>
     if (filters.status === "new" && !offer.isNew) return false;
     if (filters.flights && !filters.flights.includes(offer.flights)) return false;
     if (filters.board && !filters.board.includes(offer.board)) return false;
-    if (filters.query && !matchesQuery(filters.query, offer.resort, offer.hotel, offer.brandName, offer.countryName))
-      return false;
+    if (words.length > 0 && !matchesWords(words, offer.haystack)) return false;
     return true;
   });
 

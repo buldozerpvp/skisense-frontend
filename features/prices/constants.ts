@@ -9,3 +9,5 @@ export const PRICES_ENDPOINTS = API_BASE_URL
       latest: "/api/prices/latest",
       all: "/api/prices/all",
     } as const);
+
+export const HISTORY_IDLE_TIMEOUT_MS = 1200;

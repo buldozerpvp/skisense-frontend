@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Stack, TextField } from "@mui/material";
 import type { MRT_Column, MRT_RowData } from "material-react-table";
 import { DATE_FIELD_MIN_WIDTH_PX } from "@/features/offers/filtering/constants";
@@ -10,6 +11,7 @@ export const DateRangeFilter = <TData extends MRT_RowData,>({
   column,
 }: {
   column: MRT_Column<TData>;
+  value?: unknown;
 }) => {
   const [from = "", to = ""] = (column.getFilterValue() as DateRangeValue) ?? ["", ""];
 
@@ -47,3 +49,5 @@ export const isWithinDateRange = (value: string, range: DateRangeValue | undefin
   if (to && value > to) return false;
   return true;
 };
+
+export const MemoDateRangeFilter = memo(DateRangeFilter) as typeof DateRangeFilter;

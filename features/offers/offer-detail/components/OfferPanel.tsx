@@ -20,7 +20,7 @@ import { BOARD_DETAIL, BOARD_ICON, BOARD_LABEL, roomLabel } from "@/features/off
 import { HotelMap } from "@/features/resorts/hotels/components/HotelMap";
 import { changeColor, changeLabel } from "@/features/offers/components/OfferRow";
 import { OfferPriceHistory } from "@/features/offers/offer-detail/components/OfferPriceHistory";
-import { OFFER_MEDIA_HEIGHT_PX, OFFER_PANEL_WIDTH_PX } from "@/features/offers/offer-detail/constants";
+import { OFFER_MEDIA_HEIGHT_PX, OFFER_PANEL_WIDTH_PX, PANEL_TRANSITION_MS } from "@/features/offers/offer-detail/constants";
 
 export type OfferPanelSurface = "sheet" | "drawer";
 
@@ -353,6 +353,7 @@ const DialogShell = ({ children, onClose }: { children: React.ReactNode; onClose
       fullScreen
       open
       onClose={onClose}
+      transitionDuration={PANEL_TRANSITION_MS}
       slotProps={{ paper: { sx: { bgcolor: COLORS.canvas, backgroundImage: "none", height: "100dvh" } } }}
     >
       {children}
@@ -366,6 +367,8 @@ const DrawerShell = ({ children, onClose }: { children: React.ReactNode; onClose
       anchor="right"
       open
       onClose={onClose}
+      transitionDuration={PANEL_TRANSITION_MS}
+      ModalProps={{ disableScrollLock: true }}
       sx={{ zIndex: (theme) => theme.zIndex.modal }}
       slotProps={{
         paper: {

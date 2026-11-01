@@ -57,7 +57,7 @@ interface Observation {
   row: PriceRow;
 }
 
-export const buildHomeModel = (history: SourceOfferHistory[] | undefined, upTo?: DayISO | null): HomeModel => {
+const computeHomeModel = (history: SourceOfferHistory[] | undefined, upTo?: DayISO | null): HomeModel => {
   const daySet = new Set<DayISO>();
   const series = new Map<string, { source: string; observations: Observation[] }>();
   const lastDayBySource = new Map<string, DayISO>();
@@ -156,6 +156,20 @@ export const buildHomeModel = (history: SourceOfferHistory[] | undefined, upTo?:
       lastCheck: days.length > 0 ? days[days.length - 1] : null,
     },
   };
+};
+
+const MODELS_BY_HISTORY = new WeakMap<SourceOfferHistory[], Map<string, HomeModel>>();
+
+export const buildHomeModel = (history: SourceOfferHistory[] | undefined, upTo?: DayISO | null): HomeModel => {
+  if (!history) return computeHomeModel(undefined, upTo);
+  const byDay = MODELS_BY_HISTORY.get(history) ?? new Map<string, HomeModel>();
+  MODELS_BY_HISTORY.set(history, byDay);
+  const key = upTo ?? "";
+  const cached = byDay.get(key);
+  if (cached) return cached;
+  const built = computeHomeModel(history, upTo);
+  byDay.set(key, built);
+  return built;
 };
 
 export const topMoves = (movers: HomeOffer[], perSide = 6): HomeOffer[] => {

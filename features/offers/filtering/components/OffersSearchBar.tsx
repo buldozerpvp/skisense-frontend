@@ -1,11 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Badge, Box, IconButton, InputBase, Stack, Typography } from "@mui/material";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import { COLORS } from "@/shared/design/tokens";
 import { TAP } from "@/features/app-shell/components/MobileShell";
+import { SEARCH_SETTLE_MS } from "@/features/offers/constants";
 
 export const SearchBar = ({
   value,
@@ -21,6 +23,19 @@ export const SearchBar = ({
   placeholder: string;
 }) => {
   const on = activeCount > 0;
+  const [text, setText] = useState(value);
+  const [committed, setCommitted] = useState(value);
+  if (value !== committed) {
+    setCommitted(value);
+    setText(value);
+  }
+
+  useEffect(() => {
+    if (text === value) return;
+    const timer = setTimeout(() => onChange(text), SEARCH_SETTLE_MS);
+    return () => clearTimeout(timer);
+  }, [text, value, onChange]);
+
   return (
     <Stack
       direction="row"
@@ -38,23 +53,26 @@ export const SearchBar = ({
           minHeight: 40,
           px: 1.5,
           borderRadius: 999,
-          border: `1px solid ${value ? COLORS.brand : COLORS.border}`,
+          border: `1px solid ${text ? COLORS.brand : COLORS.border}`,
           bgcolor: COLORS.surface,
         }}
       >
         <SearchRoundedIcon sx={{ fontSize: 17, color: COLORS.inkFaint }} />
         <InputBase
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
           placeholder={placeholder}
           inputProps={{ "aria-label": placeholder, enterKeyHint: "search" }}
           sx={{ flex: 1, fontSize: 16, color: COLORS.ink }}
         />
-        {value && (
+        {text && (
           <IconButton
             size="small"
             aria-label="Clear the search"
-            onClick={() => onChange("")}
+            onClick={() => {
+              setText("");
+              onChange("");
+            }}
             sx={{ color: COLORS.inkMuted }}
           >
             <CloseRoundedIcon sx={{ fontSize: 16 }} />

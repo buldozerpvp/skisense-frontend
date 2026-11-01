@@ -14,6 +14,7 @@ import { ChipRow, CountBar, FilterChip, SearchBar } from "@/features/offers/filt
 import { FilterSheet } from "@/features/offers/filtering/components/FilterSheet";
 import { OfferRow, OfferRowSkeleton } from "@/features/offers/components/OfferRow";
 import { OfferPanel } from "@/features/offers/offer-detail/components/OfferPanel";
+import { usePreloadOfferPanel } from "@/features/offers/offer-detail/hooks/usePreloadOfferPanel";
 
 const PAGE = 60;
 
@@ -24,6 +25,7 @@ export const OffersScreen = () => {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [limit, setLimit] = useState(PAGE);
   const [open, setOpen] = useState<Offer | null>(null);
+  usePreloadOfferPanel();
 
   const activeCount = activeFilterCount(filters);
 

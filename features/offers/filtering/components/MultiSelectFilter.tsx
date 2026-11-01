@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   Button,
   Checkbox,
@@ -34,10 +34,12 @@ export const MultiSelectFilter = <T extends MRT_RowData,>({
   column: MRT_Column<T>;
   options: MultiSelectOption[];
   searchThreshold?: number;
+  value?: unknown;
 }) => {
   const raw = column.getFilterValue() as string[] | undefined;
   const selected = raw ?? options.map((o) => o.value);
   const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
 
   const visible = useMemo(() => {
     const query = search.trim();
@@ -67,6 +69,9 @@ export const MultiSelectFilter = <T extends MRT_RowData,>({
       variant="standard"
       value={selected}
       onChange={handleChange}
+      open={open}
+      onOpen={() => setOpen(true)}
+      onClose={() => setOpen(false)}
       renderValue={() => (
         <Typography variant="body2" color={selected.length ? "text.primary" : "text.secondary"} noWrap>
           {summary}
@@ -113,14 +118,14 @@ export const MultiSelectFilter = <T extends MRT_RowData,>({
 
       <Divider />
 
-      {visible.map((option) => (
+      {open && visible.map((option) => (
         <MenuItem key={option.value} value={option.value} dense>
           <Checkbox size="small" checked={selected.includes(option.value)} sx={{ py: 0.25 }} />
           <ListItemText primary={option.label} primaryTypographyProps={{ fontSize: 13 }} />
         </MenuItem>
       ))}
 
-      {visible.length === 0 && (
+      {open && visible.length === 0 && (
         <MenuItem disabled dense>
           <ListItemText primary="No matches" primaryTypographyProps={{ fontSize: 13 }} />
         </MenuItem>
@@ -135,3 +140,5 @@ export const isOneOf = (value: string | undefined, selected: unknown): boolean =
   if (!Array.isArray(list)) return true;
   return value !== undefined && list.includes(value);
 };
+
+export const MemoMultiSelectFilter = memo(MultiSelectFilter) as typeof MultiSelectFilter;

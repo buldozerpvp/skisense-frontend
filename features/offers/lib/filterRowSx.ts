@@ -1,5 +1,4 @@
 import {
-  BODY_ROW_ESTIMATE_PX,
   FILTER_ROW_ATTR,
   FILTER_ROW_WIDTH,
   HEADER_CONTENT_MIN_PX,
@@ -24,10 +23,6 @@ const OPEN_WIDTHS: Record<string, string> = Object.fromEntries(
 const HEAD = "& .MuiTableCell-head";
 
 export const filterRowPaperSx = {
-  "& tbody tr": {
-    contentVisibility: "auto",
-    containIntrinsicSize: `auto ${BODY_ROW_ESTIMATE_PX}px`,
-  },
   [HEAD]: {
     justifyContent: "center",
     minHeight: HEADER_HEIGHT_PX.bare,

@@ -7,6 +7,10 @@ import { COLORS, RADIUS } from "@/shared/design/tokens";
 import { useThemeMode } from "@/features/app-shell/hooks/useThemeMode";
 import { RESORT_MAP_ZOOM } from "@/features/resorts/constants";
 
+export const preloadMapLibrary = (): void => {
+  void import("leaflet");
+};
+
 export const ResortMap = ({
   lat,
   lon,

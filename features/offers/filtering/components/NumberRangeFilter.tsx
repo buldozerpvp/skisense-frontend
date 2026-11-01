@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Stack, TextField } from "@mui/material";
 import type { MRT_Column, MRT_RowData } from "material-react-table";
 
@@ -11,6 +12,7 @@ export const NumberRangeFilter = <TData extends MRT_RowData,>({
 }: {
   column: MRT_Column<TData>;
   prefix?: string;
+  value?: unknown;
 }) => {
   const [min = "", max = ""] = (column.getFilterValue() as NumberRangeValue) ?? ["", ""];
 
@@ -48,3 +50,5 @@ export const isWithinNumberRange = (value: number, range: NumberRangeValue | und
   if (max !== "" && value > Number(max)) return false;
   return true;
 };
+
+export const MemoNumberRangeFilter = memo(NumberRangeFilter) as typeof NumberRangeFilter;

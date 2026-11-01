@@ -71,6 +71,29 @@ collector machine being reachable from the internet.
   right today rather than after the next `backfill:hotels`. Decode at the
   boundary, not at each render site: the name is read by the table, the
   panel, the filter sheet, the map and the resort card.
+- **The full history travels packed.** `/api/prices/all` answers in the
+  `ss-history-v1` format (`features/prices/lib/historyCodec.ts`): every
+  string interned once, and each offer's unchanging fields stored once as a
+  "meta" row, so a day's snapshot is just `[meta, price, status]` triplets.
+  16.5 MB of JSON became 1.8 MB (569 KB → 144 KB gzipped), and parsing went
+  from 83 ms to 5 ms plus 35 ms to unpack. `fetchAllOffers` unpacks it back
+  into exactly the old `SourceOfferHistory[]` — verified lossless against
+  the stored data with a deep-equality round trip — so nothing downstream
+  knows. It still accepts the unpacked shape, which is what a browser
+  pointed straight at the backend via `NEXT_PUBLIC_API_BASE_URL` receives.
+- **History is fetched once the page is idle**, not alongside the latest
+  prices: `fetchAllOffers` waits for `requestIdleCallback` (at most
+  `HISTORY_IDLE_TIMEOUT_MS`). The table, the phone list and their prices
+  paint first; sparklines, moves and the analytics charts fill in a moment
+  later, which they were always written to tolerate.
+- **Every heavy derivation of the history is computed once per data load.**
+  `buildSeriesIndex`, `buildHomeModel` and `buildOffers` cache their result
+  in a `WeakMap` keyed by the input arrays, so the table, the offer panel,
+  the phone list and the analytics charts share one index instead of each
+  building its own. The offer panel used to rebuild the whole series index
+  — every offer, every night — each time an offer was opened, and that one
+  line was half of the panel's opening time. **Never mutate what these
+  return**; it is shared.
 - Responses carry `s-maxage=300, stale-while-revalidate=86400`. Prices change
   once a night, so the CDN answers repeat visits and the database is left
   alone — which is what keeps Neon's free egress allowance comfortable.
@@ -90,6 +113,13 @@ collector machine being reachable from the internet.
   in `next.config.ts`. The CSP allows inline styles and scripts because
   emotion and Next's hydration bootstrap need them; tightening that means
   nonces and giving up static rendering.
+- **How performance was measured, so it can be measured again:** a
+  production build (`next build && next start`) against the stored snapshot
+  files, driven by Playwright with the browser's own Event Timing and
+  Long Tasks APIs, plus CDP CPU profiles to attribute time to functions. The
+  sky and the pulsing dots were switched off for those runs, because headless
+  Chromium composites on the CPU and continuous animation there inflates
+  every number in a way a real graphics card does not.
 
 ## Layout
 
@@ -314,6 +344,12 @@ brings its own header and bottom bar.
   `buildHomeModel`, looked up by the same `source|resortId|hotel|date|nights`
   key, and stays null until the history query lands — the list must not wait
   for it.
+- **The phone search box owns its text too.** `SearchBar` keeps what is
+  typed in local state and commits it to the filter store after
+  `SEARCH_SETTLE_MS`; it adopts the store's value whenever that changes
+  from outside (a "clear" elsewhere). Offers carry a prebuilt `haystack`, so
+  filtering the list is a handful of `includes` per offer rather than
+  re-normalising four fields of every offer per keystroke.
 - **One filter store** (`useOfferFilters`) for every screen, so narrowing on
   Brands is still narrowing when you switch to Offers. `null` on a
   multi-select means no filter, the same three states the desktop
@@ -363,7 +399,19 @@ full screen on a phone (`surface="sheet"`), a 440px panel on the right of the
 table on a desktop (`surface="drawer"`). Two copies of that content would have
 drifted apart by the second change, so there is only one.
 
-- The desktop table builds its detail model with `buildOffers` from the
+- **Opening an offer does not re-render the table.** The open offer's key
+  lives in the `useOpenOffer` store; a row's click writes to it with
+  `getState()` and `TableOfferPanel` is the only subscriber. With the key in
+  `OffersTable`'s own state, every open and every close re-rendered the
+  whole table under the panel. `TableOfferPanel` builds its offers only once
+  a key is set, after warming `buildOffers` on idle so the first open finds
+  it cached. The drawer opens with `disableScrollLock` (no full-page relayout
+  to hide the scrollbar), a 170 ms slide (`PANEL_TRANSITION_MS`) and the map
+  library already loaded: `usePreloadOfferPanel` imports Leaflet on idle on
+  both the table page and the phone list. Measured: the click itself is
+  ~5 ms of script and the panel's first frame ~120 ms on the slow sandbox,
+  down from ~850 ms blocked.
+- The desktop panel builds its detail model with `buildOffers` from the
   same query the phone uses, and finds the clicked offer by key.
   **`offerDetailKey` in `OffersTable` must stay character-for-character the
   same expression as `key` in `features/offers/lib/offerModel.ts`** — they are built from
@@ -508,34 +556,56 @@ whatever that map holds, so adding a source later is a data job, not a UI one.
   party size resets the page and scrolls back to the top — a grown page held
   across a filter change would show a jarringly long list of a suddenly small
   result.
-- **Searching costs one render, after you stop typing.** Measured before the
-  fix in a production build: 600–1,800ms of blocked main thread *per
-  keystroke* and six seconds to settle on "tignes". Three causes, three fixes:
-  - **The search box owns its own text.** `TableSearch` keeps the value in
-    local state, so a keystroke re-renders the input and nothing else, and it
-    hands the text to the store only after `SEARCH_SETTLE_MS` without
-    another key. The table used to re-render on every character. Do not
-    move this onto `useTransition` or `useDeferredValue`: the store is
-    zustand, and `useSyncExternalStore` updates always render synchronously,
-    so neither would actually defer anything.
-  - **Rows are searched against a prebuilt haystack.** `haystacks` is built
-    once per data load — each row's resort, hotel, board and country run
-    through `searchKey` — and a query is then a handful of `includes` per
-    row. `matchesQuery` used to re-normalise all six fields of all ~3,400
-    rows on every keystroke. Same matching rules either way; they live in
-    `offerSearch.ts` as `queryWords` / `searchHaystack` / `matchesWords`.
-  - **A search never rebuilds the columns.** The filter dropdown options and
-    the hotel display labels come from `brandRows`, not the search result.
-    Built from the search result, every keystroke changed them, and they are
-    in the `columns` memo's dependencies — so all fifteen column definitions
-    and every visible cell were rebuilt per character. A dropdown that lists
-    every resort whatever you typed is also simply the expected behaviour.
-  The page also drops back to the first 50 rows **in the same render** as
-  the change, through the set-state-during-render pattern on `shownShape`,
-  rather than in an effect after it. From an effect, a scrolled-out page of
-  250 rows was rendered against the new result first and only then cut to
-  50 — two full table renders for one search. After: 10–20ms a keystroke
-  and about half a second to the new rows on the sandbox's slow CPU.
+- **A table render is cheap, and a search costs exactly one.** Measured in a
+  production build on the sandbox's slow CPU, a search went from two renders
+  of ~400 ms each to one of ~100 ms, and a keystroke to new rows painted is
+  about 220 ms including the deliberate pause. What it took, most valuable
+  first:
+  - **Cells are plain elements with static classes**
+    (`OffersTable.module.css`), not `Box`/`Typography` with `sx`. Profiling
+    showed MUI's `sx` processing and emotion's style serialisation as the
+    single largest cost of a render — paid per element, per row, per render.
+    Native `title` attributes replaced the per-cell `Tooltip`s, a plain `<a>`
+    replaced the `IconButton` and an `<img>` the `Avatar`.
+  - **Cell and row styling lives once, on the Paper** (`tableBodySx.ts`).
+    `muiTableBodyCellProps` only returns a class name (`ss-col-<id>`) and
+    `muiTableBodyRowProps` only handlers, so MRT has no per-cell `sx` of
+    ours to process.
+  - **Rows are virtualised at a fixed height.** Only the rows in view (plus
+    `ROW_OVERSCAN`) are rendered, and `measureElement` returns
+    `ROW_HEIGHT_PX` instead of measuring: MRT's default measures every row
+    with `getBoundingClientRect`, which forced a layout per row and was the
+    single hottest function at load. Fixed height means the hotel name and
+    the board caption are one line each with an ellipsis (the full name is
+    the `title`, and in the offer panel). Endless scroll still works — the
+    page grows, the virtualiser draws the visible slice of it.
+  - **The always-mounted filter controls cost nothing per render.** They
+    are `Memo*` versions of `MultiSelectFilter`, `DateRangeFilter` and
+    `NumberRangeFilter`, given the column's filter value as a prop purely so
+    the memo breaks when the filter changes, and fed option lists that are
+    module constants or memos — an inline `.map()` there defeats the memo.
+    `MultiSelectFilter` only builds its menu items while its menu is open:
+    MUI's `Select` walks and clones every child on every render, and the
+    hotel list has hundreds.
+  - **`autoResetPageIndex: false`.** TanStack reset the page in an effect
+    after every data change, which was a second full render for every search;
+    the `shownShape` reset already does it in the first.
+  - **Dates sort with `"basic"`, names with `"text"`.** The default for a
+    string column is `alphanumeric`, which splits both strings with a regex
+    on every comparison — thousands of comparisons per sort.
+  - **The search box owns its text** (`TableSearch`) and hands it to the
+    table after `SEARCH_SETTLE_MS` (60 ms) without another key; rows are
+    matched against a `WeakMap` of prebuilt haystacks; and filter options and
+    hotel labels come from `brandRows`, so a search never rebuilds the
+    columns.
+  Two things were tried and taken out. **Rendering search results inside a
+  `useTransition`** made it slower: the expensive parts — MRT's row models
+  and the commit — are each a single uninterruptible block, so every
+  keystroke restarted the same work. **Search as an MRT global filter**, to
+  keep the table's data identical across searches, never filtered at all,
+  and the row model turned out to cost under a millisecond anyway. Still on
+  the table, out of our hands: MRT's container re-reads both toolbar heights
+  in a layout effect with no dependencies, forcing a layout on every render.
 - **The table sorts by departure date.** A € a night column was built and
   then taken out again by choice; it is worth knowing that total price is not
   comparable across stay lengths, so a sort on Total ranks three-night breaks
@@ -593,11 +663,6 @@ whatever that map holds, so adding a source later is a data job, not a UI one.
   sits over scrolled rows — then the rows show through it clearly enough to
   read. Same reason the pinned Open cell gets `opacity: 1` and loses MRT's
   grey `::before` overlay: with both, its header is the same blue as the rest.
-- **Body rows carry `content-visibility: auto`** with an intrinsic height of
-  `BODY_ROW_ESTIMATE_PX`. A width change re-lays out every rendered row, and
-  this lets the browser skip the rows scrolled out of the 560px frame — it
-  took about 40% off the cost of opening the filters with fifty rows, and the
-  saving grows as endless scroll adds more.
 - **The filter row is closed by default**, behind a Filters button carrying
   the count of active filters. Open, it costs 104px of header — a fifth of the
   visible table before a single row. **Columns carry two widths**: `COLUMN_WIDTH`

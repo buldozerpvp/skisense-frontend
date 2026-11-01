@@ -87,7 +87,8 @@ export const FILTER_ROW_WIDTH: Partial<Record<ColumnKey, number>> = {
   status: 126,
 };
 export const FILTER_ROW_ATTR = "data-filter-row";
-export const BODY_ROW_ESTIMATE_PX = 62;
+export const ROW_HEIGHT_PX = 58;
+export const ROW_OVERSCAN = 4;
 export const GLASS_BLUR = "blur(10px) saturate(140%)";
 export const HEADER_HEIGHT_PX = { withFilters: 104, bare: 0 } as const;
 export const HEADER_CONTENT_MIN_PX = { withFilters: 30, bare: 0 } as const;
@@ -119,5 +120,5 @@ export const PRICE_TINT_PCT = { head: 13, body: 6 } as const;
 
 export const PAGE_SIZE = 25;
 export const SCROLL_CHUNK = 50;
-export const SEARCH_SETTLE_MS = 140;
+export const SEARCH_SETTLE_MS = 60;
 export const SCROLL_REACH_PX = 320;
